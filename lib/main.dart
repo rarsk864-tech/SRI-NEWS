@@ -1,0 +1,80 @@
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/notification_service.dart';
+import 'package:flutter/material.dart';
+import 'firebase_options.dart';
+import 'pages/home_page.dart';
+import 'pages/login_page.dart';
+import 'pages/admin_page.dart';
+import 'services/auth_service.dart';
+
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseMessaging.onBackgroundMessage(
+    _firebaseMessagingBackgroundHandler,
+  );
+  await NotificationService.instance.initialize();
+  runApp(const SriNewsApp());
+}
+
+class SriNewsApp extends StatelessWidget {
+  const SriNewsApp({super.key});
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    title: 'SRI NEWS',
+    theme: ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD71920)),
+      scaffoldBackgroundColor: Colors.white,
+    ),
+    home: const HomePage(),
+    routes: {
+      '/admin': (_) => const AdminGate(),
+    },
+  );
+}
+
+class AdminGate extends StatelessWidget {
+  const AdminGate({super.key});
+
+  Future<bool> _isOwner() async {
+    final user = AuthService().auth.currentUser;
+    if (user == null) return false;
+    try {
+      final token = await user.getIdTokenResult(true);
+      return token.claims?['admin'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder(
+    stream: AuthService().state,
+    builder: (_, s) {
+      if (!s.hasData) return const LoginPage();
+      return FutureBuilder<bool>(
+        future: _isOwner(),
+        builder: (_, owner) {
+          if (owner.connectionState != ConnectionState.done) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+          if (owner.data == true) return const AdminPage();
+          AuthService().logout();
+          return const LoginPage();
+        },
+      );
+    },
+  );
+}
