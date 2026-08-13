@@ -1,0 +1,88 @@
+name: Build SRI News APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android platform files
+        run: |
+          mkdir -p /tmp/flutter_base
+          flutter create --org com.srinews --platforms android /tmp/flutter_base
+          rm -rf android
+          cp -R /tmp/flutter_base/android ./android
+          grep -rl 'com.srinews.sri_news' android | xargs -r sed -i 's/com\.srinews\.sri_news/com.srinews.app/g'
+          mkdir -p android/app
+          cp google-services.json android/app/google-services.json
+
+      - name: Configure SRI NEWS app label and icon
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          import re
+          s = re.sub(r'android:label="[^"]*"', 'android:label="SRI NEWS"', s, count=1)
+          p.write_text(s)
+          PY
+
+      - name: Configure Firebase Gradle plugin
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/settings.gradle.kts')
+          if p.exists():
+              s = p.read_text()
+              if 'com.google.gms.google-services' not in s:
+                  s = s.replace('plugins {', 'plugins {\n    id("com.google.gms.google-services") version "4.4.4" apply false', 1)
+              p.write_text(s)
+          else:
+              p = Path('android/settings.gradle')
+              s = p.read_text()
+              if 'com.google.gms.google-services' not in s:
+                  s = s.replace('pluginManagement {', 'pluginManagement {', 1)
+              p.write_text(s)
+          app = Path('android/app/build.gradle.kts')
+          if app.exists():
+              s = app.read_text()
+              if 'com.google.gms.google-services' not in s:
+                  s = s.replace('plugins {', 'plugins {\n    id("com.google.gms.google-services")', 1)
+              app.write_text(s)
+          else:
+              app = Path('android/app/build.gradle')
+              s = app.read_text()
+              if "com.google.gms.google-services" not in s:
+                  s += "\napply plugin: 'com.google.gms.google-services'\n"
+              app.write_text(s)
+          PY
+
+      - name: Get packages
+        run: |
+          flutter pub get
+          dart run flutter_launcher_icons
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sri-news-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
