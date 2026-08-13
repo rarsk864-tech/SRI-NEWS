@@ -10,7 +10,7 @@ workflows:
       - name: Generate Android project
         script: |
           rm -rf android
-          flutter create --org com.srinews --project-name SRI NEWS --platforms android .
+          flutter create --org com.srinews --project-name sri_news --platforms android .
           sed -i 's/android:label="[^"]*"/android:label="SRI NEWS"/' android/app/src/main/AndroidManifest.xml
 
           mkdir -p android/app
