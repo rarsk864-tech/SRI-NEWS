@@ -1,0 +1,132 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // SRI NEWS OWNER
+    // Firebase Authentication UID:
+    // awKV4C8EnfN2B15hCYAcTkGy7nl1
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return signedIn()
+        && request.auth.uid == 'awKV4C8EnfN2B15hCYAcTkGy7nl1';
+    }
+
+    // -------------------------
+    // NEWS
+    // -------------------------
+    match /news/{newsId} {
+      allow read: if true;
+
+      // Owner can create, update and delete news.
+      allow create, update, delete: if isOwner();
+
+      // Users can update only likes/likeCount.
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likes', 'likeCount']);
+    }
+
+    // -------------------------
+    // COMMENTS
+    // -------------------------
+    match /comments/{commentId} {
+      allow read: if true;
+
+      // User creates a comment for themselves.
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Owner can moderate everything.
+      allow update, delete: if isOwner();
+
+      // User can update/delete only their own comment.
+      allow update, delete: if signedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // -------------------------
+    // LIKES
+    // -------------------------
+    match /likes/{likeId} {
+      allow read: if true;
+
+      allow create, delete: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+
+      allow update: if false;
+    }
+
+    // -------------------------
+    // USERS
+    // -------------------------
+    match /users/{userId} {
+      // Owner must be able to query all users for Reporter Approval.
+      allow read: if isOwner()
+        || (signedIn() && userId == request.auth.uid);
+
+      // User can create only their own profile.
+      allow create: if signedIn()
+        && userId == request.auth.uid;
+
+      // Owner can approve/reject/update any user.
+      allow update: if isOwner();
+
+      // Normal user can update their own profile, but cannot change
+      // security-sensitive identity/role fields.
+      allow update: if signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            'name',
+            'photoUrl',
+            'displayName',
+            'reporterStatus'
+          ])
+        && (
+          !request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasAny(['reporterStatus'])
+          ||
+          request.resource.data.reporterStatus == 'pending'
+        );
+
+      allow delete: if isOwner();
+    }
+
+    // -------------------------
+    // REPORTER POSTS
+    // -------------------------
+    match /reporterPosts/{postId} {
+      // Owner must be able to query pending posts.
+      allow read: if isOwner()
+        || (signedIn()
+          && resource.data.reporterId == request.auth.uid);
+
+      // Approved reporters can submit posts.
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // Owner can approve/reject posts.
+      allow update, delete: if isOwner();
+
+      // Reporter may edit/delete only their own pending post.
+      allow update, delete: if signedIn()
+        && resource.data.reporterId == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'pending';
+    }
+
+    // -------------------------
+    // DEFAULT DENY
+    // -------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
