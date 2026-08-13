@@ -1,0 +1,36 @@
+name: sri_news
+description: SRI News complete Firebase starter.
+publish_to: "none"
+version: 1.3.0+4
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^4.0.0
+  firebase_auth: ^6.0.0
+  cloud_firestore: ^6.0.0
+  firebase_storage: ^13.0.0
+  firebase_messaging: ^16.0.0
+  image_picker: ^1.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/sri_news_icon.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/sri_news_icon.png
+  adaptive_icon_background: "#B30000"
+  adaptive_icon_foreground: assets/sri_news_icon.png
+  min_sdk_android: 21
