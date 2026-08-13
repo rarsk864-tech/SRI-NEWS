@@ -1,0 +1,34 @@
+workflows:
+  android-release:
+    name: SRI News Android APK
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+
+    scripts:
+      - name: Generate Android project
+        script: |
+          rm -rf android
+          flutter create --org com.srinews --project-name sri_news --platforms android .
+          sed -i 's/android:label="[^"]*"/android:label="SRI NEWS"/' android/app/src/main/AndroidManifest.xml
+
+          mkdir -p android/app
+          cp google-services.json android/app/google-services.json
+
+          sed -i 's/com\.srinews\.app/com.srinews.app/g' android/app/build.gradle.kts
+
+          echo "Application configuration:"
+          grep -n "namespace\|applicationId" android/app/build.gradle.kts
+
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+          dart run flutter_launcher_icons
+
+      - name: Build release APK
+        script: |
+          flutter build apk --release
+
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
