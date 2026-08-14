@@ -1,5 +1,0 @@
-Matter scroll fix:
-- Removed maxLines/ellipsis truncation from news matter.
-- No nested/inner matter scroll is used.
-- One news remains one PageView page.
-- The next news is reached by vertical page swipe.
