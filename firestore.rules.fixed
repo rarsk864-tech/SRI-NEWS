@@ -1,0 +1,220 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // AUTH
+    // ============================================================
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return signedIn()
+        && request.auth.uid == 'awKV4C8EnfN2B15hCYAcTkGy7n1l';
+    }
+
+    // Admin role is stored on the user's profile.
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwnerOrAdmin() {
+      return isOwner() || isAdmin();
+    }
+
+    // ============================================================
+    // NEWS
+    // ============================================================
+    match /news/{newsId} {
+      // Everyone can read published news.
+      allow read: if true;
+
+      // Owner and Admin can create/delete news.
+      allow create, delete: if isOwnerOrAdmin();
+
+      // Owner/Admin can edit. Normal users can only update likes.
+      allow update: if isOwnerOrAdmin()
+        || (
+          signedIn()
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['likes', 'likeCount'])
+        );
+    }
+
+    // ============================================================
+    // LIKES
+    // ============================================================
+    match /news/{newsId}/likes/{userId} {
+      allow read: if true;
+
+      allow create: if signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+
+      allow delete: if signedIn()
+        && userId == request.auth.uid
+        && resource.data.userId == request.auth.uid;
+
+      allow update: if false;
+    }
+
+    // ============================================================
+    // COMMENTS
+    // ============================================================
+    match /news/{newsId}/comments/{commentId} {
+      allow read: if true;
+
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+
+      allow delete: if isOwnerOrAdmin()
+        || (
+          signedIn()
+          && resource.data.userId == request.auth.uid
+        );
+
+      allow update: if isOwnerOrAdmin()
+        || (
+          signedIn()
+          && resource.data.userId == request.auth.uid
+        );
+    }
+
+    // ============================================================
+    // USERS
+    // ============================================================
+    match /users/{userId} {
+      // Owner can see all profiles. User can see own profile.
+      allow read: if isOwnerOrAdmin()
+        || (signedIn() && userId == request.auth.uid);
+
+      // User can create own profile. Owner/Admin can create profiles.
+      allow create: if isOwnerOrAdmin()
+        || (signedIn() && userId == request.auth.uid);
+
+      // Owner can update anything.
+      // Admin can update role/profile fields except owner account.
+      // User can update safe profile fields.
+      allow update: if isOwner()
+        || (
+          isAdmin()
+          && userId != 'awKV4C8EnfN2B15hCYAcTkGy7n1l'
+          && request.resource.data.role != 'owner'
+        )
+        || (
+          signedIn()
+          && userId == request.auth.uid
+          && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'name',
+              'photoUrl',
+              'displayName',
+              'reporterStatus',
+              'profileImage',
+              'profilePhoto'
+            ])
+        );
+
+      // Only Owner can delete users/admins/reporters.
+      allow delete: if isOwner();
+    }
+
+    // ============================================================
+    // REPORTER POSTS
+    // ============================================================
+    match /reporterPosts/{postId} {
+      // Owner/Admin can see all reporter posts.
+      // Reporter can see only own posts.
+      allow read: if isOwnerOrAdmin()
+        || (
+          signedIn()
+          && resource.data.reporterId == request.auth.uid
+        );
+
+      // Approved reporter can create a pending post.
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // Owner/Admin can approve/reject/edit/delete.
+      // Reporter can edit only own pending post.
+      allow update: if isOwnerOrAdmin()
+        || (
+          signedIn()
+          && resource.data.reporterId == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.reporterId == request.auth.uid
+          && request.resource.data.status == 'pending'
+        );
+
+      allow delete: if isOwnerOrAdmin()
+        || (
+          signedIn()
+          && resource.data.reporterId == request.auth.uid
+          && resource.data.status == 'pending'
+        );
+    }
+
+    // ============================================================
+    // REPORTER APPLICATIONS
+    // ============================================================
+    match /reporterApplications/{applicationId} {
+
+      // Owner/Admin can read all applications.
+      // Applicant can read only their own application.
+      allow read: if isOwnerOrAdmin()
+        || (
+          signedIn()
+          && (
+            resource.data.userId == request.auth.uid
+            || resource.data.reporterId == request.auth.uid
+          )
+        );
+
+      // Signed-in user can create their own application.
+      allow create: if signedIn()
+        && (
+          request.resource.data.userId == request.auth.uid
+          || request.resource.data.reporterId == request.auth.uid
+        );
+
+      // Owner/Admin can approve/reject/edit.
+      // Applicant can edit only while pending.
+      allow update: if isOwnerOrAdmin()
+        || (
+          signedIn()
+          && (
+            resource.data.userId == request.auth.uid
+            || resource.data.reporterId == request.auth.uid
+          )
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'pending'
+        );
+
+      // Owner/Admin can delete applications.
+      // Applicant can delete their own application.
+      allow delete: if isOwnerOrAdmin()
+        || (
+          signedIn()
+          && (
+            resource.data.userId == request.auth.uid
+            || resource.data.reporterId == request.auth.uid
+          )
+        );
+    }
+
+
+    // ============================================================
+    // DEFAULT DENY
+    // ============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
