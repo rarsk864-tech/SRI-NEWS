@@ -1,3 +1,0 @@
-SRI NEWS app display name fix
-
-The Android application label is explicitly set to "SRI NEWS" in both Codemagic and GitHub Actions after the generated Android project is created. The internal Flutter project/package name remains sri_news.
