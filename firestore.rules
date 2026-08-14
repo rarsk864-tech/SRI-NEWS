@@ -1,0 +1,186 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // AUTH
+    // ============================================================
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return signedIn()
+        && request.auth.uid == 'awKV4C8EnfN2B15hCYAcTkGy7nl1';
+    }
+
+    // ============================================================
+    // NEWS
+    // ============================================================
+
+    match /news/{newsId} {
+
+      // Everyone can read published news.
+      allow read: if true;
+
+      // Owner can create/delete news.
+      allow create, delete: if isOwner();
+
+      // Owner can update anything.
+      //
+      // Normal logged-in users can update only:
+      // likes / likeCount
+      //
+      // This keeps normal users from changing title,
+      // matter, image, category, etc.
+      allow update: if isOwner()
+        || (
+          signedIn()
+          && request.resource.data.diff(resource.data)
+              .affectedKeys()
+              .hasOnly([
+                'likes',
+                'likeCount'
+              ])
+        );
+
+
+      // ==========================================================
+      // LIKES
+      // Path:
+      // news/{newsId}/likes/{userId}
+      // ==========================================================
+
+      match /likes/{userId} {
+
+        // Everyone can read like documents.
+        allow read: if true;
+
+        // User can create only his/her own like.
+        allow create: if signedIn()
+          && userId == request.auth.uid
+          && request.resource.data.userId == request.auth.uid;
+
+        // User can remove only his/her own like.
+        allow delete: if signedIn()
+          && userId == request.auth.uid
+          && resource.data.userId == request.auth.uid;
+
+        // Likes should not be edited.
+        allow update: if false;
+      }
+
+
+      // ==========================================================
+      // COMMENTS
+      // Path:
+      // news/{newsId}/comments/{commentId}
+      // ==========================================================
+
+      match /comments/{commentId} {
+
+        // Everyone can read comments.
+        allow read: if true;
+
+        // Logged-in user can create only his/her own comment.
+        allow create: if signedIn()
+          && request.resource.data.userId == request.auth.uid;
+
+        // Owner can edit/delete any comment.
+        allow update, delete: if isOwner();
+
+        // Normal user can edit/delete only own comment.
+        allow update, delete: if signedIn()
+          && resource.data.userId == request.auth.uid;
+      }
+    }
+
+
+    // ============================================================
+    // USERS
+    // ============================================================
+
+    match /users/{userId} {
+
+      // Owner can read all users.
+      // Normal user can read own profile.
+      allow read: if isOwner()
+        || (
+          signedIn()
+          && userId == request.auth.uid
+        );
+
+      // User creates own profile.
+      allow create: if signedIn()
+        && userId == request.auth.uid;
+
+      // Owner can update anything.
+      allow update: if isOwner();
+
+      // Normal user can update safe profile fields only.
+      //
+      // Reporter status can only be changed by the user
+      // to "pending" when applying.
+      allow update: if signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'name',
+              'photoUrl',
+              'displayName',
+              'reporterStatus'
+            ])
+        && (
+          !request.resource.data.diff(resource.data)
+              .affectedKeys()
+              .hasAny(['reporterStatus'])
+          || request.resource.data.reporterStatus == 'pending'
+        );
+
+      // Only Owner can delete users.
+      allow delete: if isOwner();
+    }
+
+
+    // ============================================================
+    // REPORTER POSTS
+    // ============================================================
+
+    match /reporterPosts/{postId} {
+
+      // Owner can read all reporter posts.
+      // Reporter can read own posts.
+      allow read: if isOwner()
+        || (
+          signedIn()
+          && resource.data.reporterId == request.auth.uid
+        );
+
+      // Approved reporter can submit pending post.
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // Owner can approve/reject/edit/delete.
+      allow update, delete: if isOwner();
+
+      // Reporter can edit/delete own post while pending.
+      allow update, delete: if signedIn()
+        && resource.data.reporterId == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'pending';
+    }
+
+
+    // ============================================================
+    // DEFAULT DENY
+    // ============================================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
