@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /news_images/{uid}/{fileName} {
+      allow read: if true;
+      allow write, delete: if request.auth != null
+        && request.auth.uid == uid
+        && (firestore.get(/databases/(default)/documents/users/$(uid)).data.role == 'owner'
+            || firestore.get(/databases/(default)/documents/users/$(uid)).data.role == 'admin'
+            || firestore.get(/databases/(default)/documents/users/$(uid)).data.role == 'administrator');
+    }
+
+    match /reporter_posts/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && (firestore.get(/databases/(default)/documents/users/$(uid)).data.reporterStatus == 'approved'
+            || firestore.get(/databases/(default)/documents/users/$(uid)).data.role == 'reporter');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
