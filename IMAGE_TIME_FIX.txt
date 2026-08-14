@@ -1,7 +1,0 @@
-SRI NEWS Image + Today/Yesterday update
-
-- Admin and Owner Post News now support gallery image upload to Firebase Storage.
-- Breaking News remains a toggle and is shown only when enabled.
-- Admin and Owner Edit News can change the image and breaking state.
-- News cards show Today, Yesterday, recent days, or a date based on publishedAt.
-- Storage rules allow authenticated Admin/Owner accounts to write news images.
