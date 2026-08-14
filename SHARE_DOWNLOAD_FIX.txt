@@ -1,1 +1,0 @@
-Correction: Bottom Download UI is replaced by Share; _downloadFullPost code retained. Top image Share removed. Bottom navigation remains Read / Explore / Account.
