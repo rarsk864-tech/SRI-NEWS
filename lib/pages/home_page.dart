@@ -30,10 +30,11 @@ Widget _coloredMatterText(
   double height = 1.5,
   int? maxLines,
   TextOverflow overflow = TextOverflow.clip,
+  FontWeight fontWeight = FontWeight.w600,
 }) {
   final fallback = TextSpan(
     text: item.description.isNotEmpty ? item.description : item.content,
-    style: TextStyle(color: Color(item.matterColor), fontSize: fontSize, height: height),
+    style: TextStyle(color: Color(item.matterColor), fontSize: fontSize, height: height, fontWeight: fontWeight),
   );
   final segments = item.matterSegments.where((e) => e.text.isNotEmpty).toList();
   if (segments.isEmpty) {
@@ -43,7 +44,7 @@ Widget _coloredMatterText(
     TextSpan(
       children: segments.map((segment) => TextSpan(
         text: segment.text,
-        style: TextStyle(color: Color(segment.color), fontSize: fontSize, height: height),
+        style: TextStyle(color: Color(segment.color), fontSize: fontSize, height: height, fontWeight: fontWeight),
       )).toList(),
     ),
     maxLines: maxLines,
@@ -138,7 +139,10 @@ class _HomePageState extends State<HomePage> {
               final now = DateTime.now();
               final breaking = items.where((e) {
                 final d = e.publishedAt?.toLocal();
-                return e.breaking && d != null && d.year == now.year && d.month == now.month && d.day == now.day;
+                final headline = e.title.trim();
+                final hasRealHeadline = headline.isNotEmpty && headline.toUpperCase() != 'BREAKING NEWS';
+                return e.breaking && hasRealHeadline && d != null &&
+                    d.year == now.year && d.month == now.month && d.day == now.day;
               }).toList();
               return Column(
                 children: [
@@ -214,14 +218,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _categoryBar() {
+    // Keep Home's top tags in sync with the Explore categories.
     const categories = <String, String>{
-      'హోమ్': 'అన్నీ',
-      'వార్తలు': 'దేశం',
       'ఆంధ్రప్రదేశ్': 'ఆంధ్రప్రదేశ్',
       'తెలంగాణ': 'తెలంగాణ',
-      'సినిమా': 'సినిమా',
-      'క్రీడలు': 'క్రీడలు',
+      'దేశం': 'దేశం',
+      'అంతర్జాతీయం': 'అంతర్జాతీయం',
       'బిజినెస్': 'బిజినెస్',
+      'క్రీడలు': 'క్రీడలు',
+      'సినిమా': 'సినిమా',
+      'టెక్నాలజీ': 'టెక్నాలజీ',
+      'విద్య': 'విద్య',
+      'ఆరోగ్యం': 'ఆరోగ్యం',
+      'రాశి ఫలాలు': 'రాశి ఫలాలు',
+      'దేవుళ్ళు': 'దేవుళ్ళు',
+      'వాతావరణం': 'వాతావరణం',
+      'తెలుగు మేమ్స్': 'తెలుగు మేమ్స్',
     };
     return SizedBox(
       height: 46,
@@ -1048,7 +1060,7 @@ class _NewsDetailPageState extends State<NewsDetailPage> {
                       ...urls.map((url) => Padding(padding: const EdgeInsets.only(bottom: 10), child: _DataImage(url: url))),
                     ],
                     if (matter.isNotEmpty)
-                      _coloredMatterText(item, fontSize: 17, height: 1.58),
+                      _coloredMatterText(item, fontSize: 17, height: 1.58, fontWeight: FontWeight.w700),
                   ],
                 ),
               ),
@@ -1538,8 +1550,8 @@ class ExplorePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final service = NewsService();
     const categories = [
-      ('తెలంగాణ', Icons.location_on_outlined),
       ('ఆంధ్రప్రదేశ్', Icons.map_outlined),
+      ('తెలంగాణ', Icons.location_on_outlined),
       ('దేశం', Icons.account_balance_outlined),
       ('అంతర్జాతీయం', Icons.public_outlined),
       ('బిజినెస్', Icons.business_center_outlined),

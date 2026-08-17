@@ -124,6 +124,7 @@ class _OwnerPageState extends State<OwnerPage> {
                 final tag = tagController.text.trim();
                 final title = titleController.text.trim();
                 final matter = matterController.text.trim();
+                final savedMatterSegments = normalizedMatterSegments(matter, matterSegments, matterColor);
                 await db.collection('news').add({
                   'category': tag,
                   'tag': tag,
@@ -145,7 +146,7 @@ class _OwnerPageState extends State<OwnerPage> {
                   'titleColorHex': '#${titleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                   'matterColor': matterColor,
                   'matterColorHex': '#${matterColor.toRadixString(16).padLeft(8, '0').substring(2)}',
-                  'matterSegments': normalizedMatterSegments(matterController.text.trim(), matterSegments, matterColor).map((e) => e.toMap()).toList(),
+                  'matterSegments': savedMatterSegments.map((e) => e.toMap()).toList(),
                 });
                 if (sheetContext.mounted) Navigator.of(sheetContext).pop();
                 _message(isBreakingNews ? 'Breaking News published successfully.' : 'Post published successfully.');
