@@ -151,7 +151,7 @@ class _AdminPageState extends State<AdminPage> {
                   'titleColorHex': '#${titleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                   'matterColor': matterColor,
                   'matterColorHex': '#${matterColor.toRadixString(16).padLeft(8, '0').substring(2)}',
-                  'matterSegments': normalizedMatterSegments(content.text.trim(), matterSegments, matterColor).map((e) => e.toMap()).toList(),
+                  'matterSegments': normalizedMatterSegments(matterController.text.trim(), matterSegments, matterColor).map((e) => e.toMap()).toList(),
                 });
 
                 if (sheetContext.mounted) {
@@ -565,7 +565,7 @@ class _AdminPageState extends State<AdminPage> {
                   'breaking': breaking,
         'titleColor': titleColor,
         'matterColor': matterColor,
-                  'matterSegments': normalizedMatterSegments(content.text.trim(), matterSegments, matterColor).map((e) => e.toMap()).toList(),
+                  'matterSegments': normalizedMatterSegments(matterController.text.trim(), matterSegments, matterColor).map((e) => e.toMap()).toList(),
                   'editedAt': FieldValue.serverTimestamp(),
                   'editedBy': uid,
                 });
