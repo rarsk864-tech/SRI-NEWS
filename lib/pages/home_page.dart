@@ -139,9 +139,7 @@ class _HomePageState extends State<HomePage> {
               final now = DateTime.now();
               final breaking = items.where((e) {
                 final d = e.publishedAt?.toLocal();
-                final headline = e.title.trim();
-                final hasRealHeadline = headline.isNotEmpty && headline.toUpperCase() != 'BREAKING NEWS';
-                return e.breaking && hasRealHeadline && d != null &&
+                return e.breaking && d != null &&
                     d.year == now.year && d.month == now.month && d.day == now.day;
               }).toList();
               return Column(
