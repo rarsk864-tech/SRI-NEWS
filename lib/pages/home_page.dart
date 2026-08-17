@@ -2097,3 +2097,23 @@ Owner/Admin అనుమతి లేకుండా సాధారణ వి�
   }
 }
 
+
+
+class NotificationsPage extends StatelessWidget {
+  const NotificationsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Notifications'),
+      ),
+      body: const Center(
+        child: Text(
+          'No notifications yet.',
+          style: TextStyle(fontSize: 16, color: Colors.black54),
+        ),
+      ),
+    );
+  }
+}
