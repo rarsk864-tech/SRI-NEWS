@@ -115,9 +115,17 @@ class _MatterColorEditorState extends State<MatterColorEditor> {
           spacing: 7,
           runSpacing: 7,
           children: widget.colors.map((c) {
-            return InkWell(
-              onTap: widget.enabled ? () => _applyColor(c) : null,
-              borderRadius: BorderRadius.circular(20),
+            return GestureDetector(
+              // Capture the selection before the colour button takes focus.
+              onTapDown: widget.enabled
+                  ? (_) => _lastSelection = widget.controller.selection
+                  : null,
+              onTap: widget.enabled
+                  ? () {
+                      _lastSelection = widget.controller.selection;
+                      _applyColor(c);
+                    }
+                  : null,
               child: Container(
                 width: 32,
                 height: 32,
@@ -146,7 +154,7 @@ class _MatterColorEditorState extends State<MatterColorEditor> {
                     ? [TextSpan(text: text, style: TextStyle(color: Color(widget.defaultColor)))]
                     : _segments.map((s) => TextSpan(
                         text: s.text,
-                        style: TextStyle(color: Color(s.color), fontSize: 15, height: 1.45),
+                        style: TextStyle(color: Color(s.color), fontSize: 15, height: 1.45, fontWeight: FontWeight.w600),
                       )).toList(),
               ),
             ),
