@@ -26,11 +26,13 @@ class MatterColorEditor extends StatefulWidget {
 class _MatterColorEditorState extends State<MatterColorEditor> {
   late List<MatterSegment> _segments;
   bool _internal = false;
+  TextSelection _lastSelection = const TextSelection.collapsed(offset: 0);
 
   @override
   void initState() {
     super.initState();
     _segments = _validSegments(widget.initialSegments);
+    _lastSelection = widget.controller.selection;
     widget.controller.addListener(_textChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => widget.onChanged(_segments));
   }
@@ -60,7 +62,7 @@ class _MatterColorEditorState extends State<MatterColorEditor> {
   }
 
   void _applyColor(int color) {
-    final selection = widget.controller.selection;
+    final selection = _lastSelection.isValid ? _lastSelection : widget.controller.selection;
     if (!selection.isValid || selection.start == selection.end) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Matter lo text select chesi colour tap cheyyandi.')),
@@ -95,6 +97,7 @@ class _MatterColorEditorState extends State<MatterColorEditor> {
           enabled: widget.enabled,
           minLines: 4,
           maxLines: 10,
+          onSelectionChanged: (selection, _) => _lastSelection = selection,
           decoration: const InputDecoration(
             labelText: 'Matter',
             hintText: 'Matter type chesi, colour kavalsina words select cheyyandi',
