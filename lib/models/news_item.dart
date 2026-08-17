@@ -4,6 +4,8 @@ class NewsItem {
   final List<String> imageUrls;
   final DateTime? publishedAt;
   final bool breaking;
+  final int titleColor;
+  final int matterColor;
 
   const NewsItem({
     required this.id,
@@ -16,6 +18,8 @@ class NewsItem {
     this.imageUrls = const [],
     this.publishedAt,
     this.breaking = false,
+    this.titleColor = 0xFF171313,
+    this.matterColor = 0xFF6C6767,
   });
 
   factory NewsItem.fromMap(String id, Map<String, dynamic> m) {
@@ -35,6 +39,8 @@ class NewsItem {
               : <String>[]),
       publishedAt: p?.toDate(),
       breaking: m['breaking'] == true,
+      titleColor: (m['titleColor'] is num) ? (m['titleColor'] as num).toInt() : 0xFF171313,
+      matterColor: (m['matterColor'] is num) ? (m['matterColor'] as num).toInt() : 0xFF6C6767,
     );
   }
 
@@ -48,5 +54,7 @@ class NewsItem {
     'time': time,
     'publishedAt': publishedAt,
     'breaking': breaking,
+    'titleColor': titleColor,
+    'matterColor': matterColor,
   };
 }
