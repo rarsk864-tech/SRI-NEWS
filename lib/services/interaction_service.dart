@@ -11,11 +11,14 @@ class InteractionService {
   CollectionReference<Map<String, dynamic>> _comments(String newsId) =>
       db.collection('news').doc(newsId).collection('comments');
 
+
   Stream<int> likeCount(String newsId) =>
       _likes(newsId).snapshots().map((s) => s.size);
 
   Stream<int> commentCount(String newsId) =>
       _comments(newsId).snapshots().map((s) => s.size);
+
+
 
   Stream<bool> likedByMe(String newsId) {
     return auth.authStateChanges().asyncExpand((user) {
@@ -41,6 +44,8 @@ class InteractionService {
 
   Stream<QuerySnapshot<Map<String, dynamic>>> comments(String newsId) =>
       _comments(newsId).orderBy('createdAt', descending: true).snapshots();
+
+
 
   Future<void> addComment(String newsId, String text) async {
     final user = auth.currentUser;
