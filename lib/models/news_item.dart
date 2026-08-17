@@ -22,6 +22,17 @@ class NewsItem {
     this.matterColor = 0xFF6C6767,
   });
 
+  static int _readColor(dynamic value, int fallback) {
+    if (value is num) return value.toInt();
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty) return fallback;
+    var hex = text.toLowerCase().replaceFirst('#', '');
+    if (hex.startsWith('0x')) hex = hex.substring(2);
+    final parsed = int.tryParse(hex, radix: 16);
+    if (parsed == null) return fallback;
+    return hex.length <= 6 ? (0xFF000000 | parsed) : parsed;
+  }
+
   factory NewsItem.fromMap(String id, Map<String, dynamic> m) {
     final p = m['publishedAt'];
     return NewsItem(
@@ -39,8 +50,8 @@ class NewsItem {
               : <String>[]),
       publishedAt: p?.toDate(),
       breaking: m['breaking'] == true,
-      titleColor: (m['titleColor'] is num) ? (m['titleColor'] as num).toInt() : 0xFF171313,
-      matterColor: (m['matterColor'] is num) ? (m['matterColor'] as num).toInt() : 0xFF6C6767,
+      titleColor: _readColor(m['titleColor'] ?? m['titleColorHex'], 0xFF171313),
+      matterColor: _readColor(m['matterColor'] ?? m['matterColorHex'], 0xFF6C6767),
     );
   }
 
