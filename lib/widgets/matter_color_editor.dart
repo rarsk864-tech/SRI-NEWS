@@ -23,8 +23,12 @@ class MatterColorEditor extends StatefulWidget {
   State<MatterColorEditor> createState() => _MatterColorEditorState();
 }
 
-class _MatterColorEditorState extends State<MatterColorEditor> {
+class MatterColorEditorState extends State<MatterColorEditor> {
   late List<MatterSegment> _segments;
+
+  /// Current coloured portions, read by the post-save flow so the latest
+  /// selection is persisted even if the parent has not rebuilt yet.
+  List<MatterSegment> get segments => List.unmodifiable(_segments);
   bool _internal = false;
   TextSelection _lastSelection = const TextSelection.collapsed(offset: 0);
 
@@ -45,6 +49,23 @@ class _MatterColorEditorState extends State<MatterColorEditor> {
       return [MatterSegment(text: text, color: widget.defaultColor)];
     }
     return input.where((e) => e.text.isNotEmpty).toList();
+  }
+
+  @override
+  void didUpdateWidget(covariant MatterColorEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_textChanged);
+      widget.controller.addListener(_textChanged);
+      _lastSelection = widget.controller.selection;
+    }
+    final incoming = _validSegments(widget.initialSegments);
+    final joined = incoming.map((e) => e.text).join();
+    if (joined == widget.controller.text &&
+        incoming.map((e) => e.toMap().toString()).join() !=
+            _segments.map((e) => e.toMap().toString()).join()) {
+      _segments = incoming;
+    }
   }
 
   void _textChanged() {
