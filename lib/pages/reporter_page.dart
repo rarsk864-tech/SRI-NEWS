@@ -151,7 +151,7 @@ class _ReporterPageState extends State<ReporterPage> {
                   'titleColorHex': '#${titleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                 'matterColor': matterColor,
                   'matterColorHex': '#${matterColor.toRadixString(16).padLeft(8, '0').substring(2)}',
-                  'matterSegments': matterSegments.map((e) => e.toMap()).toList(),
+                  'matterSegments': normalizedMatterSegments(matterController.text.trim(), matterSegments, matterColor).map((e) => e.toMap()).toList(),
               });
               if (sheetContext.mounted) Navigator.of(sheetContext).pop();
               if (mounted) {

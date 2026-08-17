@@ -151,7 +151,7 @@ class _AdminPageState extends State<AdminPage> {
                   'titleColorHex': '#${titleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                   'matterColor': matterColor,
                   'matterColorHex': '#${matterColor.toRadixString(16).padLeft(8, '0').substring(2)}',
-                  'matterSegments': matterSegments.map((e) => e.toMap()).toList(),
+                  'matterSegments': normalizedMatterSegments(matterController.text.trim(), matterSegments, matterColor).map((e) => e.toMap()).toList(),
                 });
 
                 if (sheetContext.mounted) {
@@ -442,9 +442,13 @@ class _AdminPageState extends State<AdminPage> {
         'breaking': p['breaking'] == true,
         'titleColor': p['titleColor'] is num ? (p['titleColor'] as num).toInt() : 0xFF171313,
         'matterColor': p['matterColor'] is num ? (p['matterColor'] as num).toInt() : 0xFF6C6767,
-        'matterSegments': p['matterSegments'] is List
-            ? List.from(p['matterSegments'])
-            : <Map<String, dynamic>>[],
+        'matterSegments': normalizedMatterSegments(
+          content,
+          p['matterSegments'] is List
+              ? (p['matterSegments'] as List).map((e) => MatterSegment.fromMap(e, p['matterColor'] is num ? (p['matterColor'] as num).toInt() : 0xFF6C6767)).toList()
+              : const [],
+          p['matterColor'] is num ? (p['matterColor'] as num).toInt() : 0xFF6C6767,
+        ).map((e) => e.toMap()).toList(),
         'source': 'reporter',
         'reporterId': p['reporterId'] ?? '',
         'reporterName': p['reporterName'] ?? 'Reporter',
@@ -561,7 +565,7 @@ class _AdminPageState extends State<AdminPage> {
                   'breaking': breaking,
         'titleColor': titleColor,
         'matterColor': matterColor,
-                  'matterSegments': matterSegments.map((e) => e.toMap()).toList(),
+                  'matterSegments': normalizedMatterSegments(matterController.text.trim(), matterSegments, matterColor).map((e) => e.toMap()).toList(),
                   'editedAt': FieldValue.serverTimestamp(),
                   'editedBy': uid,
                 });

@@ -13,7 +13,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/news_item.dart';
 import '../services/news_service.dart';
 import '../services/interaction_service.dart';
-import '../services/notification_service.dart';
 import 'owner_page.dart';
 import 'admin_page.dart';
 import 'reporter_page.dart';
@@ -136,7 +135,11 @@ class _HomePageState extends State<HomePage> {
               final items = s.data ?? [];
               if (items.isEmpty) return const Center(child: Text('No news available'));
 
-              final breaking = items.where((e) => e.breaking).toList();
+              final now = DateTime.now();
+              final breaking = items.where((e) {
+                final d = e.publishedAt?.toLocal();
+                return e.breaking && d != null && d.year == now.year && d.month == now.month && d.day == now.day;
+              }).toList();
               return Column(
                 children: [
                   if (breaking.isNotEmpty) _breakingTicker(breaking),
@@ -205,19 +208,21 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(width: 10),
           const Text('NEWS', style: TextStyle(color: _red, fontSize: 29, fontWeight: FontWeight.w900)),
           const Spacer(),
-          IconButton(
-            splashRadius: 23,
-            tooltip: 'Notifications',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsPage())),
-            icon: const Icon(Icons.notifications_none_rounded, size: 31, color: Color(0xFF4B3B3B)),
-          ),
         ],
       ),
     );
   }
 
   Widget _categoryBar() {
-    const categories = ['హోమ్', 'వార్తలు', 'ఆంధ్రప్రదేశ్', 'తెలంగాణ', 'సినిమా', 'క్రీడలు', 'బిజినెస్'];
+    const categories = <String, String>{
+      'హోమ్': 'అన్నీ',
+      'వార్తలు': 'దేశం',
+      'ఆంధ్రప్రదేశ్': 'ఆంధ్రప్రదేశ్',
+      'తెలంగాణ': 'తెలంగాణ',
+      'సినిమా': 'సినిమా',
+      'క్రీడలు': 'క్రీడలు',
+      'బిజినెస్': 'బిజినెస్',
+    };
     return SizedBox(
       height: 46,
       child: Container(
@@ -228,16 +233,31 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.symmetric(horizontal: 18),
           itemCount: categories.length,
           separatorBuilder: (_, __) => const SizedBox(width: 28),
-          itemBuilder: (_, i) => Center(
-            child: Text(
-              categories[i],
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
+          itemBuilder: (_, i) {
+            final label = categories.keys.elementAt(i);
+            final category = categories.values.elementAt(i);
+            return InkWell(
+              onTap: () {
+                if (category == 'అన్నీ') return;
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+                  ),
+                  builder: (_) => _CategoryNewsSheet(service: service, category: category),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  label,
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -883,9 +903,9 @@ class _NewsCardState extends State<NewsCard> {
                       maxLines: featured ? 3 : 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: featured ? 18 : 17,
-                        height: 1.25,
-                        fontWeight: FontWeight.w800,
+                        fontSize: featured ? 17 : 16,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
                         color: Color(item.titleColor),
                       ),
                     ),
@@ -893,8 +913,8 @@ class _NewsCardState extends State<NewsCard> {
                     const SizedBox(height: 5),
                     _coloredMatterText(
                       item,
-                      fontSize: featured ? 14 : 13.5,
-                      height: 1.42,
+                      fontSize: featured ? 13.5 : 13,
+                      height: 1.5,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -916,12 +936,19 @@ class _NewsCardState extends State<NewsCard> {
   }
 }
 
-class NewsDetailPage extends StatelessWidget {
+class NewsDetailPage extends StatefulWidget {
   final NewsItem item;
   const NewsDetailPage({super.key, required this.item});
 
   @override
+  State<NewsDetailPage> createState() => _NewsDetailPageState();
+}
+
+class _NewsDetailPageState extends State<NewsDetailPage> {
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     final matter = item.description.trim().isNotEmpty ? item.description : item.content;
     final urls = item.imageUrls.where((e) => e.trim().isNotEmpty).toList();
     return Scaffold(
@@ -950,14 +977,61 @@ class NewsDetailPage extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)),
-                  child: const Center(
-                    child: Text.rich(TextSpan(children: [
-                      TextSpan(text: 'BREAKING ', style: TextStyle(color: _blue, fontWeight: FontWeight.w900, fontSize: 18)),
-                      TextSpan(text: 'NEWS', style: TextStyle(color: _red, fontWeight: FontWeight.w900, fontSize: 18)),
-                    ])),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          color: _blue,
+                          child: const Text('BREAKING', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          color: _red,
+                          child: const Text('NEWS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 2),
+              child: Row(
+                children: [
+                  StreamBuilder<bool>(
+                    stream: InteractionService().likedByMe(item.id),
+                    builder: (_, liked) => StreamBuilder<int>(
+                      stream: InteractionService().likeCount(item.id),
+                      builder: (_, count) => IconButton(
+                        tooltip: 'Like',
+                        onPressed: () => _toggleLike(context),
+                        icon: Icon(Icons.thumb_up_alt_rounded, color: liked.data == true ? _blue : Colors.black45),
+                      ),
+                    ),
+                  ),
+                  StreamBuilder<int>(
+                    stream: InteractionService().likeCount(item.id),
+                    builder: (_, s) => Text('${s.data ?? 0}'),
+                  ),
+                  const SizedBox(width: 14),
+                  StreamBuilder<int>(
+                    stream: InteractionService().commentCount(item.id),
+                    builder: (_, s) => Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Comments',
+                          onPressed: () => _openComments(context),
+                          icon: const Icon(Icons.mode_comment_outlined, color: Colors.black54),
+                        ),
+                        Text('${s.data ?? 0}'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
@@ -966,7 +1040,7 @@ class NewsDetailPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (item.title.trim().isNotEmpty)
-                      Text(item.title, style: TextStyle(color: Color(item.titleColor), fontSize: 27, height: 1.3, fontWeight: FontWeight.w900)),
+                      Text(item.title, style: TextStyle(color: Color(item.titleColor), fontSize: 22, height: 1.35, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 8),
                     if (item.publishedAt != null) Text(_detailDate(item.publishedAt!), style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
                     if (urls.isNotEmpty) ...[
@@ -974,7 +1048,7 @@ class NewsDetailPage extends StatelessWidget {
                       ...urls.map((url) => Padding(padding: const EdgeInsets.only(bottom: 10), child: _DataImage(url: url))),
                     ],
                     if (matter.isNotEmpty)
-                      _coloredMatterText(item, fontSize: 18, height: 1.65),
+                      _coloredMatterText(item, fontSize: 17, height: 1.58),
                   ],
                 ),
               ),
@@ -982,6 +1056,31 @@ class NewsDetailPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Future<bool> _ensureLogin(BuildContext context) async {
+    if (FirebaseAuth.instance.currentUser != null) return true;
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginPage(initialRole: LoginRole.user)));
+    return FirebaseAuth.instance.currentUser != null;
+  }
+
+  Future<void> _toggleLike(BuildContext context) async {
+    if (!await _ensureLogin(context)) return;
+    try {
+      await InteractionService().toggleLike(widget.item.id);
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Like failed: $e')));
+    }
+  }
+
+  Future<void> _openComments(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (_) => CommentSheet(item: widget.item),
     );
   }
 
@@ -2091,27 +2190,6 @@ Owner/Admin అనుమతి లేకుండా సాధారణ వి�
               color: Colors.black87,
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-
-
-class NotificationsPage extends StatelessWidget {
-  const NotificationsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
-      ),
-      body: const Center(
-        child: Text(
-          'No notifications yet.',
-          style: TextStyle(fontSize: 16, color: Colors.black54),
         ),
       ),
     );
