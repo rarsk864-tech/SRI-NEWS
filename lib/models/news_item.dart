@@ -110,6 +110,21 @@ List<MatterSegment> applyMatterColorSelection(
       : merged;
 }
 
+
+List<MatterSegment> normalizedMatterSegments(
+  String text,
+  List<MatterSegment> segments,
+  int fallbackColor,
+) {
+  if (text.isEmpty) return const [];
+  final cleaned = segments.where((e) => e.text.isNotEmpty).toList();
+  final joined = cleaned.map((e) => e.text).join();
+  if (cleaned.isEmpty || joined != text) {
+    return [MatterSegment(text: text, color: fallbackColor)];
+  }
+  return cleaned;
+}
+
 class NewsItem {
   final String id, category, title, description, content, imageUrl, time;
   final List<String> imageUrls;
