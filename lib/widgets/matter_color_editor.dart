@@ -48,6 +48,7 @@ class _MatterColorEditorState extends State<MatterColorEditor> {
   }
 
   void _textChanged() {
+    _lastSelection = widget.controller.selection;
     if (_internal) return;
     final text = widget.controller.text;
     final joined = _segments.map((e) => e.text).join();
@@ -97,7 +98,6 @@ class _MatterColorEditorState extends State<MatterColorEditor> {
           enabled: widget.enabled,
           minLines: 4,
           maxLines: 10,
-          onSelectionChanged: (selection, _) => _lastSelection = selection,
           decoration: const InputDecoration(
             labelText: 'Matter',
             hintText: 'Matter type chesi, colour kavalsina words select cheyyandi',
