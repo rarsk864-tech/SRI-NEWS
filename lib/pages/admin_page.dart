@@ -75,8 +75,8 @@ class _AdminPageState extends State<AdminPage> {
     final titleController = TextEditingController();
     final matterController = TextEditingController();
     const postTags = [
-      'తెలంగాణ',
       'ఆంధ్రప్రదేశ్',
+      'తెలంగాణ',
       'దేశం',
       'అంతర్జాతీయం',
       'సినిమా',
@@ -103,6 +103,7 @@ class _AdminPageState extends State<AdminPage> {
         int titleColor = 0xFF171313;
         int matterColor = 0xFF6C6767;
         List<MatterSegment> matterSegments = [];
+        final matterEditorKey = GlobalKey<MatterColorEditorState>();
         return StatefulBuilder(
           builder: (context, setSheetState) {
             Future<void> publish() async {
@@ -127,7 +128,8 @@ class _AdminPageState extends State<AdminPage> {
                 final tag = tagController.text.trim();
                 final title = titleController.text.trim();
                 final matter = matterController.text.trim();
-                final savedMatterSegments = normalizedMatterSegments(matter, matterSegments, matterColor);
+                final currentMatterSegments = matterEditorKey.currentState?.segments ?? matterSegments;
+                final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
 
                 await db.collection('news').add({
                   'category': tag,
@@ -248,6 +250,7 @@ class _AdminPageState extends State<AdminPage> {
                       ),
                       const SizedBox(height: 10),
                       MatterColorEditor(
+                        key: matterEditorKey,
                         controller: matterController,
                         colors: _newsColors,
                         defaultColor: matterColor,
@@ -506,8 +509,8 @@ class _AdminPageState extends State<AdminPage> {
     bool removeImages = false;
 
     const categories = [
-      'తెలంగాణ',
       'ఆంధ్రప్రదేశ్',
+      'తెలంగాణ',
       'దేశం',
       'అంతర్జాతీయం',
       'సినిమా',

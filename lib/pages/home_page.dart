@@ -408,7 +408,12 @@ class _BreakingTickerState extends State<_BreakingTicker> {
                   itemCount: widget.items.length,
                   itemBuilder: (_, i) {
                     final item = widget.items[i];
-                    final text = item.title.trim().isEmpty ? 'BREAKING NEWS' : item.title.trim();
+                    final rawTitle = item.title.trim();
+                    final isPlaceholder = rawTitle.isEmpty || rawTitle.toUpperCase() == 'BREAKING NEWS';
+                    final rawMatter = item.description.trim().isNotEmpty ? item.description.trim() : item.content.trim();
+                    final text = isPlaceholder
+                        ? (rawMatter.isEmpty ? 'BREAKING NEWS' : (rawMatter.length > 90 ? '${rawMatter.substring(0, 90)}…' : rawMatter))
+                        : rawTitle;
                     return Padding(
                       padding: const EdgeInsets.only(right: 36),
                       child: InkWell(

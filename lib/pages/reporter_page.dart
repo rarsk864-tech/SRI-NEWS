@@ -63,8 +63,8 @@ class _ReporterPageState extends State<ReporterPage> {
     final titleController = TextEditingController();
     final matterController = TextEditingController();
     const tagOptions = [
-      'తెలంగాణ',
       'ఆంధ్రప్రదేశ్',
+      'తెలంగాణ',
       'దేశం',
       'అంతర్జాతీయం',
       'సినిమా',
@@ -90,6 +90,7 @@ class _ReporterPageState extends State<ReporterPage> {
         int titleColor = 0xFF171313;
         int matterColor = 0xFF6C6767;
         List<MatterSegment> matterSegments = [];
+        final matterEditorKey = GlobalKey<MatterColorEditorState>();
         return StatefulBuilder(builder: (context, setSheetState) {
           Future<void> submit() async {
             final user = FirebaseAuth.instance.currentUser;
@@ -127,7 +128,8 @@ class _ReporterPageState extends State<ReporterPage> {
               final tag = tagController.text.trim();
               final enteredTitle = titleController.text.trim();
               final matter = matterController.text.trim();
-                final savedMatterSegments = normalizedMatterSegments(matter, matterSegments, matterColor);
+                final currentMatterSegments = matterEditorKey.currentState?.segments ?? matterSegments;
+                final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
               final isBreaking = detailImages.isEmpty;
               final postTitle = enteredTitle.isEmpty && isBreaking
                   ? 'BREAKING NEWS'
@@ -248,6 +250,7 @@ class _ReporterPageState extends State<ReporterPage> {
                       ),
                       const SizedBox(height: 10),
                       MatterColorEditor(
+                        key: matterEditorKey,
                         controller: matterController,
                         colors: _newsColors,
                         defaultColor: matterColor,
