@@ -23,7 +23,7 @@ class MatterColorEditor extends StatefulWidget {
   State<MatterColorEditor> createState() => _MatterColorEditorState();
 }
 
-class MatterColorEditorState extends State<MatterColorEditor> {
+class _MatterColorEditorState extends State<MatterColorEditor> {
   late List<MatterSegment> _segments;
 
   /// Current coloured portions, read by the post-save flow so the latest
