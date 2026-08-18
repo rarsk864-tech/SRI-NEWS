@@ -139,8 +139,8 @@ class _HomePageState extends State<HomePage> {
               final now = DateTime.now();
               final breaking = items.where((e) {
                 final d = e.publishedAt?.toLocal();
-                return e.breaking && d != null &&
-                    d.year == now.year && d.month == now.month && d.day == now.day;
+                final cutoff = now.subtract(const Duration(days: 3));
+                return e.breaking && d != null && d.isAfter(cutoff);
               }).toList();
               return Column(
                 children: [
@@ -155,9 +155,14 @@ class _HomePageState extends State<HomePage> {
                         if (i == 0) {
                           return const Padding(
                             padding: EdgeInsets.fromLTRB(4, 4, 4, 10),
-                            child: Text(
-                              'Top News',
-                              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+                            child: Text.rich(
+                              const TextSpan(
+                                children: [
+                                  TextSpan(text: 'Top ', style: TextStyle(color: _blue)),
+                                  TextSpan(text: 'News', style: TextStyle(color: _red)),
+                                ],
+                                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+                              ),
                             ),
                           );
                         }
@@ -175,9 +180,14 @@ class _HomePageState extends State<HomePage> {
                             if (i == 2)
                               const Padding(
                                 padding: EdgeInsets.fromLTRB(4, 4, 4, 10),
-                                child: Text(
-                                  'Latest News',
-                                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+                                child: Text.rich(
+                                  const TextSpan(
+                                    children: [
+                                      TextSpan(text: 'Latest ', style: TextStyle(color: _blue)),
+                                      TextSpan(text: 'News', style: TextStyle(color: _red)),
+                                    ],
+                                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+                                  ),
                                 ),
                               ),
                             NewsCard(item: item, featured: false, fullMatter: false),
