@@ -289,14 +289,6 @@ class MatterColorEditorState extends State<MatterColorEditor> {
           enabled: widget.enabled,
           minLines: 4,
           maxLines: 10,
-          onSelectionChanged: (selection, cause) {
-            // Always remember the last real text range. Android may collapse
-            // the controller selection when the keyboard is dismissed or
-            // when a colour button receives the tap.
-            if (_nonCollapsed(selection)) {
-              _lastSelection = selection;
-            }
-          },
           decoration: const InputDecoration(
             labelText: 'Matter',
             hintText: 'Matter type chesi, colour kavalsina words select cheyyandi',
