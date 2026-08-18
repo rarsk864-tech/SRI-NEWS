@@ -92,6 +92,7 @@ class _ReporterPageState extends State<ReporterPage> {
         List<MatterSegment> matterSegments = [];
         final matterEditorKey = GlobalKey<MatterColorEditorState>();
         final titleEditorKey = GlobalKey<TitleColorEditorState>();
+        final uploadButtonKey = GlobalKey();
         return StatefulBuilder(builder: (context, setSheetState) {
           Future<void> submit() async {
             final user = FirebaseAuth.instance.currentUser;
@@ -100,6 +101,14 @@ class _ReporterPageState extends State<ReporterPage> {
               return;
             }
             // Images are optional here. No image means this is a Breaking News submission.
+            final titleNeedsSave = titleController.text.trim().isNotEmpty && !(titleEditorKey.currentState?.isSaved ?? false);
+            final matterNeedsSave = matterController.text.trim().isNotEmpty && !(matterEditorKey.currentState?.isSaved ?? false);
+            if (titleNeedsSave || matterNeedsSave) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Title/Matter colour Apply chesi Save cheyyandi.')),
+              );
+              return;
+            }
             setSheetState(() => saving = true);
             try {
               final userSnapshot = await db.collection('users').doc(user.uid).get();
@@ -131,14 +140,6 @@ class _ReporterPageState extends State<ReporterPage> {
               final matter = matterController.text.trim();
                 final currentMatterSegments = matterEditorKey.currentState?.segments ?? matterSegments;
                 final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
-                final titleSaved = titleEditorKey.currentState?.isSaved ?? false;
-                final matterSaved = matterEditorKey.currentState?.isSaved ?? false;
-                if (enteredTitle.isNotEmpty && !titleSaved) {
-                  throw Exception('Title colour Apply chesi Save cheyyandi.');
-                }
-                if (matter.isNotEmpty && !matterSaved) {
-                  throw Exception('Matter colour Apply chesi Save cheyyandi.');
-                }
               final isBreaking = detailImages.isEmpty;
               final postTitle = enteredTitle.isEmpty && isBreaking
                   ? 'BREAKING NEWS'
@@ -262,11 +263,15 @@ class _ReporterPageState extends State<ReporterPage> {
                         key: titleEditorKey,
                         controller: titleController,
                         colors: _newsColors,
-                        defaultColor: titleColor,
+                        initialColor: titleColor,
                         enabled: !saving,
-                        onSaved: (color) => setSheetState(() => titleColor = color),
+                        onSaved: (c) => setSheetState(() => titleColor = c),
+                        onNext: () {
+                          final target = matterEditorKey.currentContext;
+                          if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
+                        },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       MatterColorEditor(
                         key: matterEditorKey,
                         controller: matterController,
@@ -275,6 +280,10 @@ class _ReporterPageState extends State<ReporterPage> {
                         initialSegments: matterSegments,
                         enabled: !saving,
                         onChanged: (segments) => matterSegments = segments,
+                        onNext: () {
+                          final target = uploadButtonKey.currentContext;
+                          if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
+                        },
                       ),
                       const SizedBox(height: 14),
                       OutlinedButton.icon(
@@ -378,12 +387,13 @@ class _ReporterPageState extends State<ReporterPage> {
                       ],
                       const SizedBox(height: 16),
                       FilledButton.icon(
+                        key: uploadButtonKey,
                         onPressed: saving ? null : submit,
                         icon: const Icon(Icons.cloud_upload_outlined),
                         label: Text(
                           saving
                               ? 'Uploading...'
-                              : 'Upload Images + Details',
+                              : 'Upload Post',
                         ),
                       ),
                     ],

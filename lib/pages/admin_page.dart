@@ -105,11 +105,18 @@ class _AdminPageState extends State<AdminPage> {
         List<MatterSegment> matterSegments = [];
         final matterEditorKey = GlobalKey<MatterColorEditorState>();
         final titleEditorKey = GlobalKey<TitleColorEditorState>();
+        final uploadButtonKey = GlobalKey();
         return StatefulBuilder(
           builder: (context, setSheetState) {
             Future<void> publish() async {
               final isBreakingNews = selectedImages.isEmpty;
-              setSheetState(() => saving = true);
+              final titleNeedsSave = titleController.text.trim().isNotEmpty && !(titleEditorKey.currentState?.isSaved ?? false);
+            final matterNeedsSave = matterController.text.trim().isNotEmpty && !(matterEditorKey.currentState?.isSaved ?? false);
+            if (titleNeedsSave || matterNeedsSave) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Title/Matter colour Apply chesi Save cheyyandi.')));
+              return;
+            }
+            setSheetState(() => saving = true);
               try {
                 final adminUid = FirebaseAuth.instance.currentUser?.uid ?? '';
                 final imageUrls = <String>[];
@@ -131,14 +138,6 @@ class _AdminPageState extends State<AdminPage> {
                 final matter = matterController.text.trim();
                 final currentMatterSegments = matterEditorKey.currentState?.segments ?? matterSegments;
                 final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
-                final titleSaved = titleEditorKey.currentState?.isSaved ?? false;
-                final matterSaved = matterEditorKey.currentState?.isSaved ?? false;
-                if (title.isNotEmpty && !titleSaved) {
-                  throw Exception('Title colour Apply chesi Save cheyyandi.');
-                }
-                if (matter.isNotEmpty && !matterSaved) {
-                  throw Exception('Matter colour Apply chesi Save cheyyandi.');
-                }
 
                 await db.collection('news').add({
                   'category': tag,
@@ -262,11 +261,15 @@ class _AdminPageState extends State<AdminPage> {
                         key: titleEditorKey,
                         controller: titleController,
                         colors: _newsColors,
-                        defaultColor: titleColor,
+                        initialColor: titleColor,
                         enabled: !saving,
-                        onSaved: (color) => setSheetState(() => titleColor = color),
+                        onSaved: (c) => setSheetState(() => titleColor = c),
+                        onNext: () {
+                          final target = matterEditorKey.currentContext;
+                          if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
+                        },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       MatterColorEditor(
                         key: matterEditorKey,
                         controller: matterController,
@@ -275,6 +278,10 @@ class _AdminPageState extends State<AdminPage> {
                         initialSegments: matterSegments,
                         enabled: !saving,
                         onChanged: (segments) => matterSegments = segments,
+                        onNext: () {
+                          final target = uploadButtonKey.currentContext;
+                          if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
+                        },
                       ),
                       const SizedBox(height: 14),
                       OutlinedButton.icon(
@@ -378,12 +385,13 @@ class _AdminPageState extends State<AdminPage> {
                       ],
                       const SizedBox(height: 16),
                       FilledButton.icon(
+                        key: uploadButtonKey,
                         onPressed: saving ? null : publish,
                         icon: const Icon(Icons.cloud_upload_outlined),
                         label: Text(
                           saving
                               ? 'Uploading...'
-                              : 'Upload Images + Details',
+                              : 'Upload Post',
                         ),
                       ),
                     ],
@@ -521,6 +529,9 @@ class _AdminPageState extends State<AdminPage> {
       context: context,
       builder: (dialogContext) {
         bool saving = false;
+        final matterEditorKeyEdit = GlobalKey<MatterColorEditorState>();
+        final titleEditorKeyEdit = GlobalKey<TitleColorEditorState>();
+        final uploadButtonKeyEdit = GlobalKey();
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -529,6 +540,13 @@ class _AdminPageState extends State<AdminPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Title and content are required.')),
                 );
+                return;
+              }
+
+              final titleNeedsSave = title.text.trim().isNotEmpty && !(titleEditorKeyEdit.currentState?.isSaved ?? false);
+              final matterNeedsSave = content.text.trim().isNotEmpty && !(matterEditorKeyEdit.currentState?.isSaved ?? false);
+              if (titleNeedsSave || matterNeedsSave) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Title/Matter colour Apply chesi Save cheyyandi.')));
                 return;
               }
 
@@ -727,37 +745,32 @@ class _AdminPageState extends State<AdminPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    TitleColorEditor(
+                      key: titleEditorKeyEdit,
+                      controller: title,
+                      colors: _newsColors,
+                      initialColor: titleColor,
+                      enabled: !saving,
+                      onSaved: (c) => setDialogState(() => titleColor = c),
+                      onNext: () {
+                        final target = matterEditorKeyEdit.currentContext;
+                        if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
+                      },
+                    ),
+                    const SizedBox(height: 14),
                     MatterColorEditor(
+                      key: matterEditorKeyEdit,
                       controller: content,
                       colors: _newsColors,
                       defaultColor: matterColor,
                       initialSegments: matterSegments,
                       enabled: !saving,
                       onChanged: (segments) => matterSegments = segments,
+                      onNext: () {
+                        final target = uploadButtonKeyEdit.currentContext;
+                        if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
+                      },
                     ),
-                    const SizedBox(height: 12),
-                    const Text('Title Colour', style: TextStyle(fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 6),
-                    Wrap(spacing: 7, children: [
-                      for (final c in _newsColors)
-                        ChoiceChip(label: SizedBox(width: 20, height: 20, child: DecoratedBox(decoration: BoxDecoration(color: Color(c), shape: BoxShape.circle))), selected: titleColor == c, onSelected: saving ? null : (_) => setDialogState(() => titleColor = c)),
-                    ]),
-                    const SizedBox(height: 10),
-                    const Text('Matter Default Colour', style: TextStyle(fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 6),
-                    Wrap(spacing: 7, children: [
-                      for (final c in _newsColors)
-                        ChoiceChip(
-                          label: SizedBox(width: 20, height: 20, child: DecoratedBox(decoration: BoxDecoration(color: Color(c), shape: BoxShape.circle))),
-                          selected: matterColor == c,
-                          onSelected: saving ? null : (_) => setDialogState(() {
-                            matterColor = c;
-                            if (content.text.trim().isNotEmpty && matterSegments.isEmpty) {
-                              matterSegments = [MatterSegment(text: content.text, color: c)];
-                            }
-                          }),
-                        ),
-                    ]),
                   ],
                 ),
               ),
@@ -769,6 +782,7 @@ class _AdminPageState extends State<AdminPage> {
                   child: const Text('Cancel'),
                 ),
                 FilledButton.icon(
+                  key: uploadButtonKeyEdit,
                   onPressed: saving ? null : save,
                   icon: const Icon(Icons.save_outlined),
                   label: Text(saving ? 'Saving...' : 'Save Changes'),
