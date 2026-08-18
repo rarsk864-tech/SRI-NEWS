@@ -106,6 +106,7 @@ class _OwnerPageState extends State<OwnerPage> {
         List<MatterSegment> matterSegments = [];
         final matterEditorKey = GlobalKey<MatterColorEditorState>();
         final titleColorEditorKey = GlobalKey<TitleColorEditorState>();
+        int postStep = 0;
         return StatefulBuilder(
           builder: (context, setSheetState) {
             Future<void> publish() async {
@@ -237,25 +238,100 @@ class _OwnerPageState extends State<OwnerPage> {
                         onChanged: (_) => setSheetState(() {}),
                       ),
                       const SizedBox(height: 10),
-                      TitleColorEditor(
-                        key: titleColorEditorKey,
-                        controller: titleController,
-                        colors: _newsColors,
-                        defaultColor: titleColor,
-                        enabled: !saving,
-                        onSaved: (color) => setSheetState(() => titleColor = color),
+                      Visibility(
+                        visible: postStep == 0,
+                        maintainState: true,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text('1. Title', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                            const SizedBox(height: 8),
+                            TitleColorEditor(
+                              key: titleColorEditorKey,
+                              controller: titleController,
+                              colors: _newsColors,
+                              defaultColor: titleColor,
+                              enabled: !saving,
+                              onSaved: (color) => setSheetState(() => titleColor = color),
+                            ),
+                            const SizedBox(height: 14),
+                            FilledButton(
+                              onPressed: saving ? null : () {
+                                if (!(titleColorEditorKey.currentState?.isSaved ?? false)) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Title colour Apply chesi Save cheyyandi.')),
+                                  );
+                                  return;
+                                }
+                                FocusScope.of(context).unfocus();
+                                setSheetState(() => postStep = 1);
+                              },
+                              child: const Text('Next'),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 14),
-                      MatterColorEditor(
-                        key: matterEditorKey,
-                        controller: matterController,
-                        colors: _newsColors,
-                        defaultColor: matterColor,
-                        initialSegments: matterSegments,
-                        enabled: !saving,
-                        onChanged: (segments) => matterSegments = segments,
+                      Visibility(
+                        visible: postStep == 1,
+                        maintainState: true,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text('2. Matter', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                            const SizedBox(height: 8),
+                            MatterColorEditor(
+                              key: matterEditorKey,
+                              controller: matterController,
+                              colors: _newsColors,
+                              defaultColor: matterColor,
+                              initialSegments: matterSegments,
+                              enabled: !saving,
+                              onChanged: (segments) => matterSegments = segments,
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: saving ? null : () => setSheetState(() => postStep = 0),
+                                    child: const Text('Back'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: saving ? null : () {
+                                      if (matterController.text.trim().isEmpty) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Matter type cheyyandi.')),
+                                        );
+                                        return;
+                                      }
+                                      if (!(matterEditorKey.currentState?.isSaved ?? false)) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Matter colour Apply chesi Save cheyyandi.')),
+                                        );
+                                        return;
+                                      }
+                                      FocusScope.of(context).unfocus();
+                                      setSheetState(() => postStep = 2);
+                                    },
+                                    child: const Text('Next'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 14),
+                      Visibility(
+                        visible: postStep == 2,
+                        maintainState: true,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text('3. Upload Post', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                            const SizedBox(height: 8),
                       OutlinedButton.icon(
                         onPressed: saving
                             ? null
@@ -363,6 +439,10 @@ class _OwnerPageState extends State<OwnerPage> {
                           saving
                               ? 'Uploading...'
                               : 'Upload Post',
+                        ),
+                      ),
+
+                          ],
                         ),
                       ),
                     ],
