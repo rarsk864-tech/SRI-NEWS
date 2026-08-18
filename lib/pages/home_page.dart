@@ -681,7 +681,27 @@ class _BreakingTickerState extends State<BreakingTicker> {
           Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4), color: _red, child: const Text('NEWS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12))),
         ])),
         const SizedBox(width: 8),
-        Expanded(child: ClipRect(child: SingleChildScrollView(controller: controller, scrollDirection: Axis.horizontal, physics: const NeverScrollableScrollPhysics(), child: Align(alignment: Alignment.centerLeft, child: Text(text, maxLines: 1, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _red))))))),
+        Expanded(
+          child: ClipRect(
+            child: SingleChildScrollView(
+              controller: controller,
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: _red,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ]),
     );
   }
