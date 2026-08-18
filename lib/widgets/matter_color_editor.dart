@@ -38,6 +38,7 @@ class TitleColorEditorState extends State<TitleColorEditor> {
   }
 
   void _apply() {
+    FocusScope.of(context).unfocus();
     setState(() {
       _appliedColor = _selectedColor;
       _applied = true;
@@ -70,7 +71,12 @@ class TitleColorEditorState extends State<TitleColorEditor> {
             border: OutlineInputBorder(),
           ),
           onChanged: (_) {
-            if (_saved) setState(() => _saved = false);
+            if (_saved || _applied) {
+              setState(() {
+                _saved = false;
+                _applied = false;
+              });
+            }
           },
         ),
         const SizedBox(height: 8),
@@ -113,6 +119,42 @@ class TitleColorEditorState extends State<TitleColorEditor> {
             ),
           ],
         ),
+        if (_saved) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF8EE),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFB9E6C4)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.check_circle, size: 18, color: Color(0xFF1B7A3A)),
+                SizedBox(width: 6),
+                Text('Title colour Saved', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF1B7A3A))),
+              ],
+            ),
+          ),
+        ],
+        if (widget.controller.text.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          const Text('Preview', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F7F7),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE0E0E0)),
+            ),
+            child: Text(
+              widget.controller.text,
+              style: TextStyle(color: Color(_appliedColor), fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -191,7 +233,7 @@ class MatterColorEditorState extends State<MatterColorEditor> {
     final joined = incoming.map((e) => e.text).join();
     final textChanged = widget.controller.text != _lastText;
     if (joined == widget.controller.text &&
-        (textChanged || !_segmentsDirty) &&
+        !_segmentsDirty &&
         incoming.map((e) => e.toMap().toString()).join() !=
             _segments.map((e) => e.toMap().toString()).join()) {
       _segments = incoming;
@@ -229,7 +271,10 @@ class MatterColorEditorState extends State<MatterColorEditor> {
   }
 
   void _applyColor() {
-    final selection = _lastSelection.isValid ? _lastSelection : widget.controller.selection;
+    final current = widget.controller.selection;
+    final selection = current.isValid && current.start != current.end
+        ? current
+        : _lastSelection;
     if (!selection.isValid || selection.start == selection.end) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Matter lo text select chesi colour Apply cheyyandi.')),
@@ -249,7 +294,9 @@ class MatterColorEditorState extends State<MatterColorEditor> {
       _appliedColor = _selectedColor;
       _colorApplied = true;
       _saved = false;
+      _lastSelection = selection;
     });
+    FocusScope.of(context).unfocus();
   }
 
   void _save() {
@@ -307,11 +354,13 @@ class MatterColorEditorState extends State<MatterColorEditor> {
               ),
             ),
             selected: _selectedColor == c,
-            onSelected: widget.enabled ? (_) => setState(() {
-              _selectedColor = c;
-              _colorApplied = false;
-              _saved = false;
-            }) : null,
+            onSelected: widget.enabled ? (_) {
+              setState(() {
+                _selectedColor = c;
+                _colorApplied = false;
+                _saved = false;
+              });
+            } : null,
           )).toList(),
         ),
         const SizedBox(height: 8),
@@ -332,6 +381,24 @@ class MatterColorEditorState extends State<MatterColorEditor> {
             ),
           ],
         ),
+        if (_saved) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF8EE),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFB9E6C4)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.check_circle, size: 18, color: Color(0xFF1B7A3A)),
+                SizedBox(width: 6),
+                Text('Selected text colour Saved', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF1B7A3A))),
+              ],
+            ),
+          ),
+        ],
         if (text.trim().isNotEmpty) ...[
           const SizedBox(height: 10),
           Container(
