@@ -104,26 +104,13 @@ class _AdminPageState extends State<AdminPage> {
         int matterColor = 0xFF6C6767;
         List<MatterSegment> matterSegments = [];
         final matterEditorKey = GlobalKey<MatterColorEditorState>();
-        final titleColorEditorKey = GlobalKey<TitleColorEditorState>();
-        int postStep = 0;
+        final titleEditorKey = GlobalKey<TitleColorEditorState>();
         return StatefulBuilder(
           builder: (context, setSheetState) {
             Future<void> publish() async {
               final isBreakingNews = selectedImages.isEmpty;
-            setSheetState(() => saving = true);
-            try {
-              final titleEditor = titleColorEditorKey.currentState;
-              final matterEditor = matterEditorKey.currentState;
-              if (titleEditor == null || !titleEditor.isSaved ||
-                  (matterController.text.trim().isNotEmpty && (matterEditor == null || !matterEditor.isSaved))) {
-                setSheetState(() => saving = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Title Colour and Matter Colour Apply chesi Save cheyyandi.')),
-                );
-                return;
-              }
-              titleColor = titleEditor.color;
-              matterColor = matterEditor?.color ?? matterColor;
+              setSheetState(() => saving = true);
+              try {
                 final adminUid = FirebaseAuth.instance.currentUser?.uid ?? '';
                 final imageUrls = <String>[];
 
@@ -142,8 +129,16 @@ class _AdminPageState extends State<AdminPage> {
                 final tag = tagController.text.trim();
                 final title = titleController.text.trim();
                 final matter = matterController.text.trim();
-              final currentMatterSegments = matterEditor?.segments ?? matterSegments;
-              final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
+                final currentMatterSegments = matterEditorKey.currentState?.segments ?? matterSegments;
+                final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
+                final titleSaved = titleEditorKey.currentState?.isSaved ?? false;
+                final matterSaved = matterEditorKey.currentState?.isSaved ?? false;
+                if (title.isNotEmpty && !titleSaved) {
+                  throw Exception('Title colour Apply chesi Save cheyyandi.');
+                }
+                if (matter.isNotEmpty && !matterSaved) {
+                  throw Exception('Matter colour Apply chesi Save cheyyandi.');
+                }
 
                 await db.collection('news').add({
                   'category': tag,
@@ -254,100 +249,34 @@ class _AdminPageState extends State<AdminPage> {
                         onChanged: (_) => setSheetState(() {}),
                       ),
                       const SizedBox(height: 10),
-                      Visibility(
-                        visible: postStep == 0,
-                        maintainState: true,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Text('1. Title', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                            const SizedBox(height: 8),
-                            TitleColorEditor(
-                              key: titleColorEditorKey,
-                              controller: titleController,
-                              colors: _newsColors,
-                              defaultColor: titleColor,
-                              enabled: !saving,
-                              onSaved: (color) => setSheetState(() => titleColor = color),
-                            ),
-                            const SizedBox(height: 14),
-                            FilledButton(
-                              onPressed: saving ? null : () {
-                                if (!(titleColorEditorKey.currentState?.isSaved ?? false)) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Title colour Apply chesi Save cheyyandi.')),
-                                  );
-                                  return;
-                                }
-                                FocusScope.of(context).unfocus();
-                                setSheetState(() => postStep = 1);
-                              },
-                              child: const Text('Next'),
-                            ),
-                          ],
+                      TextField(
+                        controller: titleController,
+                        enabled: !saving,
+                        decoration: const InputDecoration(
+                          labelText: 'Title (optional)',
+                          border: OutlineInputBorder(),
                         ),
                       ),
-                      Visibility(
-                        visible: postStep == 1,
-                        maintainState: true,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Text('2. Matter', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                            const SizedBox(height: 8),
-                            MatterColorEditor(
-                              key: matterEditorKey,
-                              controller: matterController,
-                              colors: _newsColors,
-                              defaultColor: matterColor,
-                              initialSegments: matterSegments,
-                              enabled: !saving,
-                              onChanged: (segments) => matterSegments = segments,
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: saving ? null : () => setSheetState(() => postStep = 0),
-                                    child: const Text('Back'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: saving ? null : () {
-                                      if (matterController.text.trim().isEmpty) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Matter type cheyyandi.')),
-                                        );
-                                        return;
-                                      }
-                                      if (!(matterEditorKey.currentState?.isSaved ?? false)) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Matter colour Apply chesi Save cheyyandi.')),
-                                        );
-                                        return;
-                                      }
-                                      FocusScope.of(context).unfocus();
-                                      setSheetState(() => postStep = 2);
-                                    },
-                                    child: const Text('Next'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                      const SizedBox(height: 10),
+                      TitleColorEditor(
+                        key: titleEditorKey,
+                        controller: titleController,
+                        colors: _newsColors,
+                        defaultColor: titleColor,
+                        enabled: !saving,
+                        onSaved: (color) => setSheetState(() => titleColor = color),
                       ),
-                      Visibility(
-                        visible: postStep == 2,
-                        maintainState: true,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Text('3. Upload Post', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                            const SizedBox(height: 8),
+                      const SizedBox(height: 12),
+                      MatterColorEditor(
+                        key: matterEditorKey,
+                        controller: matterController,
+                        colors: _newsColors,
+                        defaultColor: matterColor,
+                        initialSegments: matterSegments,
+                        enabled: !saving,
+                        onChanged: (segments) => matterSegments = segments,
+                      ),
+                      const SizedBox(height: 14),
                       OutlinedButton.icon(
                         onPressed: saving
                             ? null
@@ -454,11 +383,7 @@ class _AdminPageState extends State<AdminPage> {
                         label: Text(
                           saving
                               ? 'Uploading...'
-                              : 'Upload Post',
-                        ),
-                      ),
-
-                          ],
+                              : 'Upload Images + Details',
                         ),
                       ),
                     ],
