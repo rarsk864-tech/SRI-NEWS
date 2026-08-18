@@ -251,6 +251,14 @@ class _ReporterPageState extends State<ReporterPage> {
                         ),
                       ),
                       const SizedBox(height: 10),
+                      TitleColorEditor(
+                        key: titleColorEditorKey,
+                        colors: _newsColors,
+                        initialColor: titleColor,
+                        enabled: !saving,
+                        onSaved: (color) => titleColor = color,
+                      ),
+                      const SizedBox(height: 12),
                       MatterColorEditor(
                         key: matterEditorKey,
                         controller: matterController,
@@ -260,14 +268,6 @@ class _ReporterPageState extends State<ReporterPage> {
                         enabled: !saving,
                         onChanged: (segments) => matterSegments = segments,
                       ),
-                      const SizedBox(height: 12),
-                       TitleColorEditor(
-                         key: titleColorEditorKey,
-                         colors: _newsColors,
-                         initialColor: titleColor,
-                         enabled: !saving,
-                         onSaved: (color) => titleColor = color,
-                       ),
                       const SizedBox(height: 14),
                       OutlinedButton.icon(
                         onPressed: saving
