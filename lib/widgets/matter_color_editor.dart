@@ -31,12 +31,14 @@ class MatterColorEditorState extends State<MatterColorEditor> {
   List<MatterSegment> get segments => List.unmodifiable(_segments);
   bool _internal = false;
   TextSelection _lastSelection = const TextSelection.collapsed(offset: 0);
+  late String _lastText;
 
   @override
   void initState() {
     super.initState();
     _segments = _validSegments(widget.initialSegments);
     _lastSelection = widget.controller.selection;
+    _lastText = widget.controller.text;
     widget.controller.addListener(_textChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => widget.onChanged(_segments));
   }
@@ -58,6 +60,7 @@ class MatterColorEditorState extends State<MatterColorEditor> {
       oldWidget.controller.removeListener(_textChanged);
       widget.controller.addListener(_textChanged);
       _lastSelection = widget.controller.selection;
+      _lastText = widget.controller.text;
       }
     final incoming = _validSegments(widget.initialSegments);
     final joined = incoming.map((e) => e.text).join();
@@ -70,14 +73,21 @@ class MatterColorEditorState extends State<MatterColorEditor> {
 
   void _textChanged() {
     final selection = widget.controller.selection;
-    // Keep the last real text selection even when the TextField loses focus.
-    // Tapping a colour button can collapse the selection; that collapsed
-    // selection must not replace the range the user selected for colouring.
-    if (selection.isValid && selection.start != selection.end) {
+    final text = widget.controller.text;
+
+    // A keyboard/focus change can collapse the selection without changing
+    // the text. Never replace a previously selected range with that collapsed
+    // selection. This is important when the keyboard is dismissed before the
+    // user taps a colour button.
+    if (text != _lastText) {
+      _lastText = text;
+      _lastSelection = selection;
+    } else if (selection.isValid && selection.start != selection.end) {
       _lastSelection = selection;
     }
+
     if (_internal) return;
-    final text = widget.controller.text;
+
     final joined = _segments.map((e) => e.text).join();
     if (text != joined) {
       setState(() {
@@ -145,7 +155,15 @@ class MatterColorEditorState extends State<MatterColorEditor> {
             return GestureDetector(
               // Capture the selection before the colour button takes focus.
               onTapDown: widget.enabled
-                  ? (_) => _lastSelection = widget.controller.selection
+                  ? (_) {
+                      // Do not overwrite a valid previous selection with the
+                      // collapsed selection produced while the colour button
+                      // is taking focus.
+                      final selection = widget.controller.selection;
+                      if (selection.isValid && selection.start != selection.end) {
+                        _lastSelection = selection;
+                      }
+                    }
                   : null,
               onTap: widget.enabled
                   ? () => _applyColor(c)
