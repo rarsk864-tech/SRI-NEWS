@@ -2,20 +2,16 @@ import 'package:flutter/material.dart';
 import '../models/news_item.dart';
 
 class TitleColorEditor extends StatefulWidget {
-  final TextEditingController controller;
   final List<int> colors;
   final int initialColor;
-  final ValueChanged<int> onSaved;
-  final VoidCallback? onNext;
+  final ValueChanged<int>? onSaved;
   final bool enabled;
 
   const TitleColorEditor({
     super.key,
-    required this.controller,
     required this.colors,
     required this.initialColor,
-    required this.onSaved,
-    this.onNext,
+    this.onSaved,
     this.enabled = true,
   });
 
@@ -25,149 +21,102 @@ class TitleColorEditor extends StatefulWidget {
 
 class TitleColorEditorState extends State<TitleColorEditor> {
   late int _selectedColor;
-  late int _previewColor;
   late int _savedColor;
-  bool _applied = false;
-  bool _saved = false;
-  bool _internal = false;
+  late int _appliedColor;
 
-  bool get isSaved => _saved;
   int get savedColor => _savedColor;
+  bool get hasUnsavedChanges => _appliedColor != _savedColor;
+  bool get needsApply => _selectedColor != _appliedColor;
 
   @override
   void initState() {
     super.initState();
     _selectedColor = widget.initialColor;
-    _previewColor = widget.initialColor;
     _savedColor = widget.initialColor;
-    widget.controller.addListener(_textChanged);
-  }
-
-  void _textChanged() {
-    if (_internal) return;
-    if (_saved) setState(() => _saved = false);
-  }
-
-  void _apply() {
-    if (widget.controller.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Title type cheyyandi.')),
-      );
-      return;
-    }
-    setState(() {
-      _previewColor = _selectedColor;
-      _applied = true;
-      _saved = false;
-    });
-  }
-
-  void _save() {
-    if (!_applied) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mundhu Apply Colour cheyyandi.')),
-      );
-      return;
-    }
-    _savedColor = _previewColor;
-    _saved = true;
-    widget.onSaved(_savedColor);
-    setState(() {});
+    _appliedColor = widget.initialColor;
   }
 
   @override
   void didUpdateWidget(covariant TitleColorEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.removeListener(_textChanged);
-      widget.controller.addListener(_textChanged);
+    if (oldWidget.initialColor != widget.initialColor && !hasUnsavedChanges) {
+      _selectedColor = widget.initialColor;
+      _savedColor = widget.initialColor;
+      _appliedColor = widget.initialColor;
     }
   }
 
-  @override
-  void dispose() {
-    widget.controller.removeListener(_textChanged);
-    super.dispose();
+  void _applyColor() {
+    setState(() => _appliedColor = _selectedColor);
+  }
+
+  void _saveColor() {
+    setState(() => _savedColor = _selectedColor);
+    widget.onSaved?.call(_savedColor);
   }
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.controller.text;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Title Colour', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-        const SizedBox(height: 7),
+        const Text('Title Colour', style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 6),
         Wrap(
           spacing: 7,
           runSpacing: 7,
           children: widget.colors.map((c) {
-            final selected = _selectedColor == c;
             return GestureDetector(
-              onTap: widget.enabled ? () => setState(() => _selectedColor = c) : null,
+              onTap: widget.enabled
+                  ? () => setState(() => _selectedColor = c)
+                  : null,
               child: Container(
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
                   color: Color(c),
                   shape: BoxShape.circle,
-                  border: Border.all(color: selected ? Colors.white : Colors.black26, width: selected ? 3 : 1),
-                  boxShadow: selected ? const [BoxShadow(color: Colors.black38, blurRadius: 2)] : null,
+                  border: Border.all(
+                    color: _selectedColor == c ? Colors.black : Colors.black26,
+                    width: _selectedColor == c ? 3 : 1,
+                  ),
                 ),
-                child: selected ? const Icon(Icons.check, color: Colors.white, size: 22) : null,
+                child: _selectedColor == c
+                    ? const Icon(Icons.check, size: 18, color: Colors.white)
+                    : null,
               ),
             );
           }).toList(),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.black12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            title.isEmpty ? 'Title preview' : title,
-            style: TextStyle(color: Color(_previewColor), fontWeight: FontWeight.w800, fontSize: 18),
-          ),
         ),
         const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: widget.enabled ? _apply : null,
-                icon: const Icon(Icons.edit),
+                onPressed: widget.enabled ? _applyColor : null,
+                icon: const Icon(Icons.colorize),
                 label: const Text('Apply Colour'),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: FilledButton.icon(
-                onPressed: widget.enabled ? _save : null,
+                onPressed: widget.enabled && hasUnsavedChanges && !needsApply ? _saveColor : null,
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('Save'),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 7),
-        Text(
-          _saved ? 'Title colour Saved' : (_applied ? 'Colour Applied — Save cheyyandi' : 'Colour select → Apply Colour → Save'),
-          style: TextStyle(color: _saved ? Colors.green.shade700 : Colors.black54, fontWeight: FontWeight.w700),
-        ),
-        if (widget.onNext != null) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: widget.enabled ? widget.onNext : null,
-              icon: const Icon(Icons.arrow_forward),
-              label: const Text('Next'),
+        Padding(
+          padding: const EdgeInsets.only(top: 7),
+          child: Text(
+            needsApply
+                ? 'Colour selected. Press Apply Colour.'
+                : (hasUnsavedChanges ? 'Colour applied. Press Save.' : 'Title colour saved'),
+              style: TextStyle(color: Colors.green, fontWeight: FontWeight.w700, fontSize: 12),
             ),
           ),
-        ],
       ],
     );
   }
@@ -179,7 +128,6 @@ class MatterColorEditor extends StatefulWidget {
   final int defaultColor;
   final List<MatterSegment> initialSegments;
   final ValueChanged<List<MatterSegment>> onChanged;
-  final VoidCallback? onNext;
   final bool enabled;
 
   const MatterColorEditor({
@@ -189,7 +137,6 @@ class MatterColorEditor extends StatefulWidget {
     required this.defaultColor,
     required this.initialSegments,
     required this.onChanged,
-    this.onNext,
     this.enabled = true,
   });
 
@@ -198,31 +145,49 @@ class MatterColorEditor extends StatefulWidget {
 }
 
 class MatterColorEditorState extends State<MatterColorEditor> {
-  late List<MatterSegment> _segments;
+  late List<MatterSegment> _savedSegments;
+  late List<MatterSegment> _workingSegments;
   TextSelection _lastSelection = const TextSelection.collapsed(offset: 0);
-  int _selectedColor = 0;
-  bool _applied = false;
-  bool _saved = false;
+  int? _selectedColor;
   bool _internal = false;
 
-  List<MatterSegment> get segments => List.unmodifiable(_segments);
-  bool get isSaved => _saved;
+  /// Only committed/saved segments are returned to the upload flow.
+  List<MatterSegment> get segments => List.unmodifiable(_savedSegments);
+  bool get hasUnsavedChanges => !_sameSegments(_savedSegments, _workingSegments);
 
   @override
   void initState() {
     super.initState();
-    _segments = _validSegments(widget.initialSegments);
-    _selectedColor = widget.defaultColor;
-    _lastSelection = widget.controller.selection;
+    final valid = _validSegments(widget.initialSegments);
+    _savedSegments = List<MatterSegment>.from(valid);
+    _workingSegments = List<MatterSegment>.from(valid);
+    _lastSelection = _nonCollapsed(widget.controller.selection)
+        ? widget.controller.selection
+        : const TextSelection.collapsed(offset: 0);
     widget.controller.addListener(_textChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => widget.onChanged(_segments));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onChanged(List.unmodifiable(_savedSegments));
+    });
+  }
+
+  bool _nonCollapsed(TextSelection selection) =>
+      selection.isValid && selection.start != selection.end;
+
+  bool _sameSegments(List<MatterSegment> a, List<MatterSegment> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].text != b[i].text || a[i].color != b[i].color) return false;
+    }
+    return true;
   }
 
   List<MatterSegment> _validSegments(List<MatterSegment> input) {
     final text = widget.controller.text;
     if (text.isEmpty) return const [];
     final joined = input.map((e) => e.text).join();
-    if (joined != text) return [MatterSegment(text: text, color: widget.defaultColor)];
+    if (joined != text) {
+      return [MatterSegment(text: text, color: widget.defaultColor)];
+    }
     return input.where((e) => e.text.isNotEmpty).toList();
   }
 
@@ -232,58 +197,71 @@ class MatterColorEditorState extends State<MatterColorEditor> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_textChanged);
       widget.controller.addListener(_textChanged);
-      _lastSelection = widget.controller.selection;
+    }
+    final incoming = _validSegments(widget.initialSegments);
+    if (!_sameSegments(incoming, _savedSegments) && !hasUnsavedChanges) {
+      _savedSegments = List<MatterSegment>.from(incoming);
+      _workingSegments = List<MatterSegment>.from(incoming);
     }
   }
 
   void _textChanged() {
     final selection = widget.controller.selection;
-    if (selection.isValid && selection.start != selection.end) _lastSelection = selection;
+    // IMPORTANT: do not replace the last real selection with a collapsed
+    // selection. Android can collapse the selection when the keyboard is
+    // hidden. The selected range must still be usable after keyboard close.
+    if (_nonCollapsed(selection)) {
+      _lastSelection = selection;
+    }
     if (_internal) return;
+
     final text = widget.controller.text;
-    final joined = _segments.map((e) => e.text).join();
+    final joined = _workingSegments.map((e) => e.text).join();
     if (text != joined) {
+      final next = text.isEmpty
+          ? const <MatterSegment>[]
+          : [MatterSegment(text: text, color: widget.defaultColor)];
       setState(() {
-        _segments = text.isEmpty ? const [] : [MatterSegment(text: text, color: widget.defaultColor)];
-        _saved = false;
-        _applied = false;
+        _savedSegments = List<MatterSegment>.from(next);
+        _workingSegments = List<MatterSegment>.from(next);
       });
-      widget.onChanged(_segments);
+      widget.onChanged(List.unmodifiable(_savedSegments));
     }
   }
 
-  void _apply() {
-    final selection = _lastSelection.isValid ? _lastSelection : widget.controller.selection;
-    if (!selection.isValid || selection.start == selection.end) {
+  void _chooseColor(int color) {
+    setState(() => _selectedColor = color);
+  }
+
+  void _applyColor() {
+    final selection = _nonCollapsed(_lastSelection)
+        ? _lastSelection
+        : (_nonCollapsed(widget.controller.selection)
+            ? widget.controller.selection
+            : null);
+
+    if (selection == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Matter lo text select chesi colour apply cheyyandi.')),
       );
       return;
     }
+
+    final color = _selectedColor ?? widget.defaultColor;
     final next = applyMatterColorSelection(
       widget.controller.text,
-      _segments,
+      _workingSegments,
       selection,
-      _selectedColor,
+      color,
       widget.defaultColor,
     );
-    setState(() {
-      _segments = next;
-      _applied = true;
-      _saved = false;
-    });
-    widget.onChanged(next);
+    setState(() => _workingSegments = next);
   }
 
-  void _save() {
-    if (!_applied) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mundhu Apply Colour cheyyandi.')),
-      );
-      return;
-    }
-    setState(() => _saved = true);
-    widget.onChanged(_segments);
+  void _saveColor() {
+    if (!hasUnsavedChanges) return;
+    setState(() => _savedSegments = List<MatterSegment>.from(_workingSegments));
+    widget.onChanged(List.unmodifiable(_savedSegments));
   }
 
   @override
@@ -295,6 +273,10 @@ class MatterColorEditorState extends State<MatterColorEditor> {
   @override
   Widget build(BuildContext context) {
     final text = widget.controller.text;
+    final previewSegments = _workingSegments.isEmpty && text.isNotEmpty
+        ? [MatterSegment(text: text, color: widget.defaultColor)]
+        : _workingSegments;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -311,69 +293,98 @@ class MatterColorEditorState extends State<MatterColorEditor> {
           ),
         ),
         const SizedBox(height: 8),
-        const Text('Text select → colour select → Apply Colour → Save.', style: TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        if (text.trim().isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F7F7),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE0E0E0)),
+            ),
+            child: Text.rich(
+              TextSpan(
+                children: previewSegments.map((s) => TextSpan(
+                  text: s.text,
+                  style: TextStyle(
+                    color: Color(s.color),
+                    fontSize: 15,
+                    height: 1.45,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )).toList(),
+              ),
+            ),
+          ),
+        const SizedBox(height: 10),
+        const Text('Select Colour', style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 6),
         Wrap(
           spacing: 7,
           runSpacing: 7,
           children: widget.colors.map((c) {
-            final selected = _selectedColor == c;
             return GestureDetector(
-              onTapDown: widget.enabled ? (_) => _lastSelection = widget.controller.selection : null,
-              onTap: widget.enabled ? () => setState(() => _selectedColor = c) : null,
+              onTap: widget.enabled ? () => _chooseColor(c) : null,
+              onTapDown: widget.enabled
+                  ? (_) {
+                      final selection = widget.controller.selection;
+                      // When keyboard is hidden, the controller can report a
+                      // collapsed selection on this tap. Keep the last real
+                      // selected range instead of overwriting it.
+                      if (_nonCollapsed(selection)) {
+                        _lastSelection = selection;
+                      }
+                    }
+                  : null,
               child: Container(
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
                   color: Color(c),
                   shape: BoxShape.circle,
-                  border: Border.all(color: selected ? Colors.white : Colors.black26, width: selected ? 3 : 1),
-                  boxShadow: selected ? const [BoxShadow(color: Colors.black38, blurRadius: 2)] : null,
+                  border: Border.all(
+                    color: _selectedColor == c ? Colors.black : Colors.black26,
+                    width: _selectedColor == c ? 3 : 1,
+                  ),
                 ),
-                child: selected ? const Icon(Icons.check, color: Colors.white, size: 22) : null,
+                child: _selectedColor == c
+                    ? const Icon(Icons.check, size: 18, color: Colors.white)
+                    : null,
               ),
             );
           }).toList(),
         ),
-        if (text.trim().isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: const Color(0xFFF7F7F7), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE0E0E0))),
-            child: Text.rich(
-              TextSpan(
-                children: _segments.isEmpty
-                    ? [TextSpan(text: text, style: TextStyle(color: Color(widget.defaultColor)))]
-                    : _segments.map((s) => TextSpan(text: s.text, style: TextStyle(color: Color(s.color), fontSize: 15, height: 1.45, fontWeight: FontWeight.w600))).toList(),
-              ),
-            ),
-          ),
-        ],
         const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(child: OutlinedButton.icon(onPressed: widget.enabled ? _apply : null, icon: const Icon(Icons.edit), label: const Text('Apply Colour'))),
-            const SizedBox(width: 12),
-            Expanded(child: FilledButton.icon(onPressed: widget.enabled ? _save : null, icon: const Icon(Icons.save_outlined), label: const Text('Save'))),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: widget.enabled ? _applyColor : null,
+                icon: const Icon(Icons.colorize),
+                label: const Text('Apply Colour'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: widget.enabled && hasUnsavedChanges && !needsApply ? _saveColor : null,
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('Save'),
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 7),
-        Text(
-          _saved ? 'Selected text colour Saved' : (_applied ? 'Colour Applied — Save cheyyandi' : 'Text select → colour select → Apply Colour → Save.'),
-          style: TextStyle(color: _saved ? Colors.green.shade700 : Colors.black54, fontWeight: FontWeight.w700),
-        ),
-        if (widget.onNext != null) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: widget.enabled ? widget.onNext : null,
-              icon: const Icon(Icons.arrow_forward),
-              label: const Text('Next'),
+        Padding(
+          padding: const EdgeInsets.only(top: 7),
+          child: Text(
+            hasUnsavedChanges ? 'Colour applied. Press Save.' : 'Colour saved',
+            style: TextStyle(
+              color: hasUnsavedChanges ? Colors.orange.shade800 : Colors.green,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
             ),
           ),
-        ],
+        ),
       ],
     );
   }
