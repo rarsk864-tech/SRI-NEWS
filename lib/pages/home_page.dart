@@ -1,6 +1,7 @@
-import 'dart:async';
 import 'dart:convert';
+import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -12,7 +13,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/news_item.dart';
 import '../services/news_service.dart';
 import '../services/interaction_service.dart';
-import '../services/notification_service.dart';
 import 'owner_page.dart';
 import 'admin_page.dart';
 import 'reporter_page.dart';
@@ -23,6 +23,34 @@ const _red = Color(0xFFE60000);
 const _darkRed = Color(0xFFC20000);
 const _blue = Color(0xFF0D47A1);
 const _bg = Color(0xFFF7F8FA);
+
+Widget _coloredMatterText(
+  NewsItem item, {
+  double fontSize = 16,
+  double height = 1.5,
+  int? maxLines,
+  TextOverflow overflow = TextOverflow.clip,
+  FontWeight fontWeight = FontWeight.w600,
+}) {
+  final fallback = TextSpan(
+    text: item.description.isNotEmpty ? item.description : item.content,
+    style: TextStyle(color: Color(item.matterColor), fontSize: fontSize, height: height, fontWeight: fontWeight),
+  );
+  final segments = item.matterSegments.where((e) => e.text.isNotEmpty).toList();
+  if (segments.isEmpty) {
+    return Text.rich(fallback, maxLines: maxLines, overflow: overflow);
+  }
+  return Text.rich(
+    TextSpan(
+      children: segments.map((segment) => TextSpan(
+        text: segment.text,
+        style: TextStyle(color: Color(segment.color), fontSize: fontSize, height: height, fontWeight: fontWeight),
+      )).toList(),
+    ),
+    maxLines: maxLines,
+    overflow: overflow,
+  );
+}
 
 
 class HomePage extends StatefulWidget {
@@ -86,7 +114,10 @@ class _HomePageState extends State<HomePage> {
     return Column(
       children: [
         _header(),
-        const SizedBox(height: 4),
+        _dateTimeStrip(),
+        const SizedBox(height: 8),
+        _categoryBar(),
+        const SizedBox(height: 8),
         Expanded(
           child: StreamBuilder<List<NewsItem>>(
             stream: service.watchNews('అన్నీ'),
@@ -95,49 +126,66 @@ class _HomePageState extends State<HomePage> {
                 return const Center(child: CircularProgressIndicator());
               }
               if (s.hasError) {
-                return Center(child: Text('News error: ${s.error}'));
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text('News error: ${s.error}', textAlign: TextAlign.center),
+                  ),
+                );
               }
               final items = s.data ?? [];
-              if (items.isEmpty) {
-                return const Center(child: Text('No news available'));
-              }
+              if (items.isEmpty) return const Center(child: Text('No news available'));
 
-              final today = DateTime.now();
-              final breaking = items.where((item) {
-                final d = item.publishedAt?.toLocal();
-                final isToday = d != null && d.year == today.year && d.month == today.month && d.day == today.day;
-                return isToday && item.breaking;
+              final now = DateTime.now();
+              final breaking = items.where((e) {
+                final d = e.publishedAt?.toLocal();
+                return e.breaking && d != null &&
+                    d.year == now.year && d.month == now.month && d.day == now.day;
               }).toList();
-
-              final top = items.where((item) {
-                final d = item.publishedAt?.toLocal();
-                final isToday = d != null && d.year == today.year && d.month == today.month && d.day == today.day;
-                return isToday;
-              }).take(1).toList();
-
-              final latest = items.where((item) => !top.contains(item)).toList();
-
-              return ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(14, 2, 14, 24),
+              return Column(
                 children: [
-                  BreakingTicker(items: breaking),
+                  if (breaking.isNotEmpty) _breakingTicker(breaking),
                   const SizedBox(height: 8),
-                  _categoryStrip(context),
-                  const SizedBox(height: 18),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('Top News', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900)),
+                  Expanded(
+                    child: ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
+                      itemCount: items.length + 1,
+                      itemBuilder: (_, i) {
+                        if (i == 0) {
+                          return const Padding(
+                            padding: EdgeInsets.fromLTRB(4, 4, 4, 10),
+                            child: Text(
+                              'Top News',
+                              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+                            ),
+                          );
+                        }
+                        if (i == 1) {
+                          return NewsCard(
+                            item: items.first,
+                            featured: true,
+                            fullMatter: false,
+                          );
+                        }
+                        final item = items[i - 1];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (i == 2)
+                              const Padding(
+                                padding: EdgeInsets.fromLTRB(4, 4, 4, 10),
+                                child: Text(
+                                  'Latest News',
+                                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            NewsCard(item: item, featured: false, fullMatter: false),
+                          ],
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  ...top.map((item) => NewsCard(item: item)),
-                  const SizedBox(height: 8),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('Latest News', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900)),
-                  ),
-                  const SizedBox(height: 10),
-                  ...latest.map((item) => NewsCard(item: item)),
                 ],
               );
             },
@@ -147,63 +195,251 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _categoryStrip(BuildContext context) {
-    const categories = [
-      'ఆంధ్రప్రదేశ్', 'తెలంగాణ', 'దేశం', 'అంతర్జాతీయం', 'బిజినెస్', 'క్రీడలు', 'సినిమా', 'టెక్నాలజీ', 'విద్య', 'ఆరోగ్యం', 'రాశి ఫలాలు', 'దేవుళ్ళు', 'వాతావరణం', 'తెలుగు మేమ్స్',
-    ];
-    return SizedBox(
-      height: 54,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) => InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CategoryNewsPage(category: categories[i]))),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(color: const Color(0xFF12A5D7), borderRadius: BorderRadius.circular(12)),
-            child: Text(categories[i], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+  Widget _header() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 14, 14, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: _blue, borderRadius: BorderRadius.circular(14)),
+            child: const Text('SRI', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
           ),
+          const SizedBox(width: 10),
+          const Text('NEWS', style: TextStyle(color: _red, fontSize: 29, fontWeight: FontWeight.w900)),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _categoryBar() {
+    // Keep Home's top tags in sync with the Explore categories.
+    const categories = <String, String>{
+      'ఆంధ్రప్రదేశ్': 'ఆంధ్రప్రదేశ్',
+      'తెలంగాణ': 'తెలంగాణ',
+      'దేశం': 'దేశం',
+      'అంతర్జాతీయం': 'అంతర్జాతీయం',
+      'బిజినెస్': 'బిజినెస్',
+      'క్రీడలు': 'క్రీడలు',
+      'సినిమా': 'సినిమా',
+      'టెక్నాలజీ': 'టెక్నాలజీ',
+      'విద్య': 'విద్య',
+      'ఆరోగ్యం': 'ఆరోగ్యం',
+      'రాశి ఫలాలు': 'రాశి ఫలాలు',
+      'దేవుళ్ళు': 'దేవుళ్ళు',
+      'వాతావరణం': 'వాతావరణం',
+      'తెలుగు మేమ్స్': 'తెలుగు మేమ్స్',
+    };
+    return SizedBox(
+      height: 46,
+      child: Container(
+        color: const Color(0xFF0D9DDB),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          itemCount: categories.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 28),
+          itemBuilder: (_, i) {
+            final label = categories.keys.elementAt(i);
+            final category = categories.values.elementAt(i);
+            return InkWell(
+              onTap: () {
+                if (category == 'అన్నీ') return;
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+                  ),
+                  builder: (_) => _CategoryNewsSheet(service: service, category: category),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  label,
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _header() {
-    final now = DateTime.now();
-    String two(int v) => v.toString().padLeft(2, '0');
-    final date = '${two(now.day)} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][now.month - 1]} ${now.year}';
-    final time = '${two(now.hour % 12 == 0 ? 12 : now.hour % 12)}:${two(now.minute)}:${two(now.second)} ${now.hour >= 12 ? "PM" : "AM"}';
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
-          child: Row(children: [
-            Container(width: 58, height: 48, alignment: Alignment.center, decoration: BoxDecoration(color: _blue, borderRadius: BorderRadius.circular(14)), child: const Text('SRI', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900))),
-            const SizedBox(width: 10),
-            const Text('NEWS', style: TextStyle(color: _red, fontSize: 29, fontWeight: FontWeight.w900)),
-          ]),
-        ),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 18),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('▣  $date', style: const TextStyle(color: _blue, fontSize: 16, fontWeight: FontWeight.w800)),
-            const Text('|', style: TextStyle(color: Colors.black26)),
-            const Text('● LIVE', style: TextStyle(color: Colors.green, fontSize: 16, fontWeight: FontWeight.w900)),
-            const Text('|', style: TextStyle(color: Colors.black26)),
-            Text('◷ $time', style: const TextStyle(color: _red, fontSize: 16, fontWeight: FontWeight.w900)),
-          ]),
-        ),
-      ],
+  Widget _dateTimeStrip() {
+    return StreamBuilder<int>(
+      stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now().millisecondsSinceEpoch),
+      initialData: DateTime.now().millisecondsSinceEpoch,
+      builder: (_, __) {
+        final now = DateTime.now();
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        final date = '${now.day.toString().padLeft(2, '0')} ${months[now.month - 1]} ${now.year}';
+        final h = now.hour % 12 == 0 ? 12 : now.hour % 12;
+        final time = '${h.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.calendar_month_rounded, color: _blue, size: 18),
+                const SizedBox(width: 6),
+                Text(date, style: const TextStyle(color: _blue, fontWeight: FontWeight.w800)),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text('|', style: TextStyle(color: Colors.black26))),
+                const Icon(Icons.circle, color: Colors.green, size: 12),
+                const SizedBox(width: 5),
+                const Text('LIVE', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w900)),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text('|', style: TextStyle(color: Colors.black26))),
+                const Icon(Icons.access_time_rounded, color: _red, size: 18),
+                const SizedBox(width: 5),
+                Text(time, style: const TextStyle(color: _red, fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _breakingTicker(List<NewsItem> breaking) => _BreakingTicker(items: breaking, onOpen: (item) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => NewsDetailPage(item: item)),
+    );
+  });
+}
+
+class _BreakingTicker extends StatefulWidget {
+  final List<NewsItem> items;
+  final ValueChanged<NewsItem> onOpen;
+  const _BreakingTicker({required this.items, required this.onOpen});
+  @override
+  State<_BreakingTicker> createState() => _BreakingTickerState();
+}
+
+class _BreakingTickerState extends State<_BreakingTicker> {
+  final ScrollController _controller = ScrollController();
+  Timer? _timer;
+  bool _paused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startTicker());
+  }
+
+  void _startTicker() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(milliseconds: 30), (_) {
+      if (!mounted || _paused || !_controller.hasClients) return;
+      final max = _controller.position.maxScrollExtent;
+      if (max <= 0) return;
+      final next = _controller.offset + 0.55;
+      if (next >= max) {
+        _controller.jumpTo(0);
+      } else {
+        _controller.jumpTo(next);
+      }
+    });
+  }
+
+  void _pause() => setState(() => _paused = true);
+  void _resume() {
+    if (mounted) setState(() => _paused = false);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(left: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: Colors.black12),
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('BREAKING', style: TextStyle(color: _blue, fontWeight: FontWeight.w900)),
+                SizedBox(width: 5),
+                Text('NEWS', style: TextStyle(color: _red, fontWeight: FontWeight.w900)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Listener(
+              onPointerDown: (_) => _pause(),
+              onPointerUp: (_) => _resume(),
+              onPointerCancel: (_) => _resume(),
+              child: Container(
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.black12),
+                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                ),
+                child: ListView.builder(
+                  controller: _controller,
+                  scrollDirection: Axis.horizontal,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  itemCount: widget.items.length,
+                  itemBuilder: (_, i) {
+                    final item = widget.items[i];
+                    final rawTitle = item.title.trim();
+                    final isPlaceholder = rawTitle.isEmpty || rawTitle.toUpperCase() == 'BREAKING NEWS';
+                    final rawMatter = item.description.trim().isNotEmpty ? item.description.trim() : item.content.trim();
+                    final text = isPlaceholder
+                        ? (rawMatter.isEmpty ? 'BREAKING NEWS' : (rawMatter.length > 90 ? '${rawMatter.substring(0, 90)}…' : rawMatter))
+                        : rawTitle;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 36),
+                      child: InkWell(
+                        onTap: () => widget.onOpen(item),
+                        child: Center(
+                          child: Text(
+                            text,
+                            maxLines: 1,
+                            overflow: TextOverflow.visible,
+                            style: TextStyle(
+                              color: Color(item.titleColor),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
-
-
 
 class NewsCard extends StatefulWidget {
   final NewsItem item;
@@ -291,6 +527,65 @@ class _NewsCardState extends State<NewsCard> {
     }
   }
 
+  Future<void> _downloadFullPost(BuildContext context) async {
+    try {
+      final urls = _postImageUrls();
+      final hasMatter = item.title.trim().isNotEmpty ||
+          item.description.trim().isNotEmpty ||
+          item.content.trim().isNotEmpty;
+
+      final dir = await getApplicationDocumentsDirectory();
+      final downloadsDir = Directory('${dir.path}/SRI_NEWS_Downloads');
+      if (!await downloadsDir.exists()) {
+        await downloadsDir.create(recursive: true);
+      }
+
+      if (!hasMatter) {
+        if (urls.isEmpty) throw Exception('No images available');
+        var saved = 0;
+        for (var i = 0; i < urls.length; i++) {
+          final bytes = _dataImageBytes(urls[i]);
+          if (bytes == null || bytes.isEmpty) continue;
+          final file = File('${downloadsDir.path}/sri_news_${item.id}_${i + 1}.jpg');
+          await file.writeAsBytes(bytes, flush: true);
+          saved++;
+        }
+        if (saved == 0) throw Exception('Could not read post images');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(saved == 1 ? 'Image saved' : '${saved} images saved')),
+          );
+        }
+        return;
+      }
+
+      final renderObject = _postKey.currentContext?.findRenderObject();
+      if (renderObject is! RenderRepaintBoundary) {
+        throw Exception('Post is not ready for download');
+      }
+      await WidgetsBinding.instance.endOfFrame;
+      final pixelRatio =
+          (MediaQuery.devicePixelRatioOf(context) * 2.0).clamp(2.0, 4.0);
+      final image = await renderObject.toImage(pixelRatio: pixelRatio);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (byteData == null) throw Exception('Could not create post image');
+      final pngBytes = byteData.buffer.asUint8List();
+      final file = File('${downloadsDir.path}/sri_news_post_${item.id}.png');
+      await file.writeAsBytes(pngBytes, flush: true);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Full post saved')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e')),
+        );
+      }
+    }
+  }
 
   Future<void> _openImageViewer(
     BuildContext context,
@@ -353,7 +648,7 @@ class _NewsCardState extends State<NewsCard> {
     }
   }
 
-  Widget _newsImage() {
+  Widget _newsImage({bool compact = false}) {
     final urls = _postImageUrls();
 
     if (urls.isEmpty) return _fallbackImage();
@@ -381,7 +676,7 @@ class _NewsCardState extends State<NewsCard> {
       );
     }
 
-    final imageHeight = fullMatter ? 420.0 : 104.0;
+    final imageHeight = featured ? 300.0 : 175.0;
 
     if (urls.length == 1) {
       return SizedBox(
@@ -554,156 +849,295 @@ class _NewsCardState extends State<NewsCard> {
 
   @override
   Widget build(BuildContext context) {
-    if (!fullMatter) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        elevation: 1,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NewsDetailPage(item: item))),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 150, height: 104, child: ClipRRect(borderRadius: BorderRadius.circular(10), child: _newsImage())),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                if (item.title.isNotEmpty) Text(item.title, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 17, height: 1.2, fontWeight: FontWeight.w900, color: Color(item.titleColor))),
-                const SizedBox(height: 5),
-                if ((item.description.isNotEmpty || item.content.isNotEmpty)) Text(item.description.isNotEmpty ? item.description : item.content, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, height: 1.35, color: Color(item.matterColor))),
-                const SizedBox(height: 5),
-                Text(_postDateLabel(), style: const TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w700)),
-              ])),
-            ]),
-          ),
-        ),
-      );
-    }
-
     final interactions = InteractionService();
-    return Card(
-      margin: const EdgeInsets.fromLTRB(0, 0, 0, 18),
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      clipBehavior: Clip.antiAlias,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _newsImage(),
-        Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 8), child: Text(item.title, style: TextStyle(fontSize: 27, height: 1.25, fontWeight: FontWeight.w900, color: Color(item.titleColor)))),
-        Padding(padding: const EdgeInsets.fromLTRB(18, 4, 18, 16), child: Text(item.description.isNotEmpty ? item.description : item.content, style: TextStyle(fontSize: 18, height: 1.65, color: Color(item.matterColor), fontWeight: FontWeight.w500))),
-        Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 7), child: Row(children: [
-          StreamBuilder<bool>(stream: interactions.likedByMe(item.id), builder: (_, liked) => IconButton(onPressed: () => _like(context), icon: Icon(liked.data == true ? Icons.favorite : Icons.favorite_border_rounded, color: liked.data == true ? _red : const Color(0xFF493D3D)))),
-          StreamBuilder<int>(stream: interactions.likeCount(item.id), builder: (_, count) => Text('${count.data ?? 0}')),
-          const SizedBox(width: 8),
-          IconButton(onPressed: () => _comment(context), icon: const Icon(Icons.mode_comment_outlined, color: Color(0xFF493D3D))),
-          StreamBuilder<int>(stream: interactions.commentCount(item.id), builder: (_, count) => Text('${count.data ?? 0}')),
-        ])),
-      ]),
+    final hasTitle = item.title.trim().isNotEmpty;
+    final hasMatter = item.description.trim().isNotEmpty || item.content.trim().isNotEmpty;
+
+    // Compact home-page card: small image + coloured title + short matter preview.
+    // Tapping any part opens the full second-page article.
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => NewsDetailPage(item: item)),
+      ),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE7E7E7)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_postImageUrls().isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: featured ? 128 : 112,
+                  height: featured ? 96 : 86,
+                  child: _newsImage(compact: true),
+                ),
+              )
+            else if (item.breaking)
+              Container(
+                width: featured ? 128 : 112,
+                height: featured ? 96 : 86,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F6FB),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: const Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: 'BREAKING\n', style: TextStyle(color: _blue, fontWeight: FontWeight.w900, fontSize: 15)),
+                    TextSpan(text: 'NEWS', style: TextStyle(color: _red, fontWeight: FontWeight.w900, fontSize: 15)),
+                  ]),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (item.breaking)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text.rich(
+                        const TextSpan(children: [
+                          TextSpan(text: 'BREAKING ', style: TextStyle(color: _blue, fontWeight: FontWeight.w900, fontSize: 12)),
+                          TextSpan(text: 'NEWS', style: TextStyle(color: _red, fontWeight: FontWeight.w900, fontSize: 12)),
+                        ]),
+                      ),
+                    ),
+                  if (hasTitle)
+                    Text(
+                      item.title,
+                      maxLines: featured ? 3 : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: featured ? 17 : 16,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
+                        color: Color(item.titleColor),
+                      ),
+                    ),
+                  if (hasMatter) ...[
+                    const SizedBox(height: 5),
+                    _coloredMatterText(
+                      item,
+                      fontSize: featured ? 13.5 : 13,
+                      height: 1.5,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (_postDateLabel().isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      _postDateLabel(),
+                      style: const TextStyle(fontSize: 11.5, color: Colors.black54, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
-
 }
 
-class NewsDetailPage extends StatelessWidget {
+class NewsDetailPage extends StatefulWidget {
   final NewsItem item;
   const NewsDetailPage({super.key, required this.item});
+
+  @override
+  State<NewsDetailPage> createState() => _NewsDetailPageState();
+}
+
+class _NewsDetailPageState extends State<NewsDetailPage> {
+
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final matter = item.description.trim().isNotEmpty ? item.description : item.content;
+    final urls = item.imageUrls.where((e) => e.trim().isNotEmpty).toList();
     return Scaffold(
       backgroundColor: _bg,
-      appBar: AppBar(
-        title: const Text('SRI NEWS', style: TextStyle(color: _red, fontWeight: FontWeight.w900)),
-        backgroundColor: _bg, foregroundColor: Colors.black87, elevation: 0,
-      ),
-      body: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(14, 4, 14, 30), child: NewsCard(item: item, fullMatter: true)),
-    );
-  }
-}
-
-class CategoryNewsPage extends StatelessWidget {
-  final String category;
-  const CategoryNewsPage({super.key, required this.category});
-  @override
-  Widget build(BuildContext context) {
-    final service = NewsService();
-    return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(title: Text(category), backgroundColor: _bg, foregroundColor: Colors.black87, elevation: 0),
-      body: StreamBuilder<List<NewsItem>>(
-        stream: service.watchNews(category),
-        builder: (_, s) {
-          if (s.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          if (s.hasError) return Center(child: Text('News error: ${s.error}'));
-          final items = s.data ?? [];
-          return ListView.builder(padding: const EdgeInsets.fromLTRB(14, 8, 14, 24), itemCount: items.length, itemBuilder: (_, i) => NewsCard(item: items[i]));
-        },
-      ),
-    );
-  }
-}
-
-class BreakingTicker extends StatefulWidget {
-  final List<NewsItem> items;
-  const BreakingTicker({super.key, required this.items});
-  @override
-  State<BreakingTicker> createState() => _BreakingTickerState();
-}
-
-class _BreakingTickerState extends State<BreakingTicker> {
-  final controller = ScrollController();
-  Timer? timer;
-  @override
-  void initState() { super.initState(); WidgetsBinding.instance.addPostFrameCallback((_) => _start()); }
-  @override
-  void didUpdateWidget(covariant BreakingTicker oldWidget) { super.didUpdateWidget(oldWidget); WidgetsBinding.instance.addPostFrameCallback((_) => _start()); }
-  void _start() {
-    timer?.cancel();
-    if (!mounted || widget.items.isEmpty) return;
-    timer = Timer.periodic(const Duration(milliseconds: 35), (_) {
-      if (!controller.hasClients || controller.position.maxScrollExtent <= 0) return;
-      final next = controller.offset + 1.2;
-      controller.jumpTo(next >= controller.position.maxScrollExtent ? 0 : next);
-    });
-  }
-  @override
-  void dispose() { timer?.cancel(); controller.dispose(); super.dispose(); }
-  @override
-  Widget build(BuildContext context) {
-    if (widget.items.isEmpty) return const SizedBox.shrink();
-    final text = widget.items.map((e) => e.title == 'BREAKING NEWS' ? (e.description.isNotEmpty ? e.description : e.content) : e.title).where((e) => e.trim().isNotEmpty).join('   •   ');
-    return Container(
-      height: 48, margin: const EdgeInsets.only(top: 4), padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _red.withOpacity(.35)), borderRadius: BorderRadius.circular(12)),
-      child: Row(children: [
-        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7), decoration: BoxDecoration(borderRadius: BorderRadius.circular(6)), child: Row(children: [
-          Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4), color: _blue, child: const Text('BREAKING', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12))),
-          Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4), color: _red, child: const Text('NEWS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12))),
-        ])),
-        const SizedBox(width: 8),
-        Expanded(
-          child: ClipRect(
-            child: SingleChildScrollView(
-              controller: controller,
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  text,
-                  maxLines: 1,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: _red,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+              child: Row(
+                children: [
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded)),
+                  const Spacer(),
+                  const Text('SRI', style: TextStyle(color: _blue, fontSize: 25, fontWeight: FontWeight.w900)),
+                  const Text(' NEWS', style: TextStyle(color: _red, fontSize: 25, fontWeight: FontWeight.w900)),
+                  const Spacer(),
+                  const SizedBox(width: 48),
+                ],
+              ),
+            ),
+            _DetailDateTimeStrip(),
+            if (item.breaking)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9)),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          color: _blue,
+                          child: const Text('BREAKING', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          color: _red,
+                          child: const Text('NEWS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 2),
+              child: Row(
+                children: [
+                  StreamBuilder<bool>(
+                    stream: InteractionService().likedByMe(item.id),
+                    builder: (_, liked) => StreamBuilder<int>(
+                      stream: InteractionService().likeCount(item.id),
+                      builder: (_, count) => IconButton(
+                        tooltip: 'Like',
+                        onPressed: () => _toggleLike(context),
+                        icon: Icon(Icons.thumb_up_alt_rounded, color: liked.data == true ? _blue : Colors.black45),
+                      ),
+                    ),
+                  ),
+                  StreamBuilder<int>(
+                    stream: InteractionService().likeCount(item.id),
+                    builder: (_, s) => Text('${s.data ?? 0}'),
+                  ),
+                  const SizedBox(width: 14),
+                  StreamBuilder<int>(
+                    stream: InteractionService().commentCount(item.id),
+                    builder: (_, s) => Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Comments',
+                          onPressed: () => _openComments(context),
+                          icon: const Icon(Icons.mode_comment_outlined, color: Colors.black54),
+                        ),
+                        Text('${s.data ?? 0}'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item.title.trim().isNotEmpty)
+                      Text(item.title, style: TextStyle(color: Color(item.titleColor), fontSize: 22, height: 1.35, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    if (item.publishedAt != null) Text(_detailDate(item.publishedAt!), style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                    if (urls.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      ...urls.map((url) => Padding(padding: const EdgeInsets.only(bottom: 10), child: _DataImage(url: url))),
+                    ],
+                    if (matter.isNotEmpty)
+                      _coloredMatterText(item, fontSize: 17, height: 1.58, fontWeight: FontWeight.w700),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-      ]),
+      ),
     );
+  }
+
+  Future<bool> _ensureLogin(BuildContext context) async {
+    if (FirebaseAuth.instance.currentUser != null) return true;
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginPage(initialRole: LoginRole.user)));
+    return FirebaseAuth.instance.currentUser != null;
+  }
+
+  Future<void> _toggleLike(BuildContext context) async {
+    if (!await _ensureLogin(context)) return;
+    try {
+      await InteractionService().toggleLike(widget.item.id);
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Like failed: $e')));
+    }
+  }
+
+  Future<void> _openComments(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (_) => CommentSheet(item: widget.item),
+    );
+  }
+
+  static String _detailDate(DateTime d) {
+    final local = d.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+  }
+}
+
+class _DetailDateTimeStrip extends StatefulWidget {
+  @override
+  State<_DetailDateTimeStrip> createState() => _DetailDateTimeStripState();
+}
+class _DetailDateTimeStripState extends State<_DetailDateTimeStrip> {
+  late final Stream<int> _clock = Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now().millisecondsSinceEpoch);
+  @override
+  Widget build(BuildContext context) => StreamBuilder<int>(stream: _clock, initialData: DateTime.now().millisecondsSinceEpoch, builder: (_, __) {
+    final now = DateTime.now();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final h = now.hour % 12 == 0 ? 12 : now.hour % 12;
+    final t = '${h.toString().padLeft(2,'0')}:${now.minute.toString().padLeft(2,'0')}:${now.second.toString().padLeft(2,'0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
+    return Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+      const Icon(Icons.calendar_month_rounded, color: _blue, size: 17), const SizedBox(width: 5), Text('${now.day} ${months[now.month-1]} ${now.year}', style: const TextStyle(color: _blue, fontWeight: FontWeight.w800)),
+      const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('|', style: TextStyle(color: Colors.black26))),
+      const Icon(Icons.circle, color: Colors.green, size: 11), const SizedBox(width: 4), const Text('LIVE', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w900)),
+      const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('|', style: TextStyle(color: Colors.black26))),
+      const Icon(Icons.access_time_rounded, color: _red, size: 17), const SizedBox(width: 4), Text(t, style: const TextStyle(color: _red, fontWeight: FontWeight.w800)),
+    ])));
+  });
+}
+
+class _DataImage extends StatelessWidget {
+  final String url;
+  const _DataImage({required this.url});
+  @override
+  Widget build(BuildContext context) {
+    if (!url.startsWith('data:image/')) return const SizedBox.shrink();
+    try {
+      final comma = url.indexOf(',');
+      if (comma <= 0) return const SizedBox.shrink();
+      return ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(base64Decode(url.substring(comma + 1)), width: double.infinity, fit: BoxFit.contain));
+    } catch (_) { return const SizedBox.shrink(); }
   }
 }
 
@@ -1776,4 +2210,3 @@ Owner/Admin అనుమతి లేకుండా సాధారణ వి�
     );
   }
 }
-
