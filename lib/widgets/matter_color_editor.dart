@@ -58,7 +58,7 @@ class MatterColorEditorState extends State<MatterColorEditor> {
       oldWidget.controller.removeListener(_textChanged);
       widget.controller.addListener(_textChanged);
       _lastSelection = widget.controller.selection;
-    }
+      }
     final incoming = _validSegments(widget.initialSegments);
     final joined = incoming.map((e) => e.text).join();
     if (joined == widget.controller.text &&
@@ -69,7 +69,13 @@ class MatterColorEditorState extends State<MatterColorEditor> {
   }
 
   void _textChanged() {
-    _lastSelection = widget.controller.selection;
+    final selection = widget.controller.selection;
+    // Keep the last real text selection even when the TextField loses focus.
+    // Tapping a colour button can collapse the selection; that collapsed
+    // selection must not replace the range the user selected for colouring.
+    if (selection.isValid && selection.start != selection.end) {
+      _lastSelection = selection;
+    }
     if (_internal) return;
     final text = widget.controller.text;
     final joined = _segments.map((e) => e.text).join();
@@ -142,10 +148,7 @@ class MatterColorEditorState extends State<MatterColorEditor> {
                   ? (_) => _lastSelection = widget.controller.selection
                   : null,
               onTap: widget.enabled
-                  ? () {
-                      _lastSelection = widget.controller.selection;
-                      _applyColor(c);
-                    }
+                  ? () => _applyColor(c)
                   : null,
               child: Container(
                 width: 32,
