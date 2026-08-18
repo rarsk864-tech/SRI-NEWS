@@ -367,7 +367,7 @@ class MatterColorEditorState extends State<MatterColorEditor> {
             const SizedBox(width: 10),
             Expanded(
               child: FilledButton.icon(
-                onPressed: widget.enabled && hasUnsavedChanges && !needsApply ? _saveColor : null,
+                onPressed: widget.enabled && hasUnsavedChanges ? _saveColor : null,
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('Save'),
               ),
