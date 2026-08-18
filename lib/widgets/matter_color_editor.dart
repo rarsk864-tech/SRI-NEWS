@@ -51,8 +51,9 @@ class TitleColorEditorState extends State<TitleColorEditor> {
   }
 
   void _saveColor() {
-    setState(() => _savedColor = _selectedColor);
-    widget.onSaved?.call(_savedColor);
+    final color = _appliedColor;
+    setState(() => _savedColor = color);
+    widget.onSaved?.call(color);
   }
 
   @override
@@ -150,6 +151,7 @@ class MatterColorEditorState extends State<MatterColorEditor> {
   TextSelection _lastSelection = const TextSelection.collapsed(offset: 0);
   int? _selectedColor;
   bool _internal = false;
+  final FocusNode _matterFocusNode = FocusNode();
 
   /// Only committed/saved segments are returned to the upload flow.
   List<MatterSegment> get segments => List.unmodifiable(_savedSegments);
@@ -234,11 +236,11 @@ class MatterColorEditorState extends State<MatterColorEditor> {
   }
 
   void _applyColor() {
-    final selection = _nonCollapsed(_lastSelection)
-        ? _lastSelection
-        : (_nonCollapsed(widget.controller.selection)
-            ? widget.controller.selection
-            : null);
+    final currentSelection = widget.controller.selection;
+    if (_nonCollapsed(currentSelection)) {
+      _lastSelection = currentSelection;
+    }
+    final selection = _nonCollapsed(_lastSelection) ? _lastSelection : null;
 
     if (selection == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -267,6 +269,7 @@ class MatterColorEditorState extends State<MatterColorEditor> {
   @override
   void dispose() {
     widget.controller.removeListener(_textChanged);
+    _matterFocusNode.dispose();
     super.dispose();
   }
 
@@ -282,9 +285,18 @@ class MatterColorEditorState extends State<MatterColorEditor> {
       children: [
         TextField(
           controller: widget.controller,
+          focusNode: _matterFocusNode,
           enabled: widget.enabled,
           minLines: 4,
           maxLines: 10,
+          onSelectionChanged: (selection, cause) {
+            // Always remember the last real text range. Android may collapse
+            // the controller selection when the keyboard is dismissed or
+            // when a colour button receives the tap.
+            if (_nonCollapsed(selection)) {
+              _lastSelection = selection;
+            }
+          },
           decoration: const InputDecoration(
             labelText: 'Matter',
             hintText: 'Matter type chesi, colour kavalsina words select cheyyandi',
@@ -328,9 +340,6 @@ class MatterColorEditorState extends State<MatterColorEditor> {
               onTapDown: widget.enabled
                   ? (_) {
                       final selection = widget.controller.selection;
-                      // When keyboard is hidden, the controller can report a
-                      // collapsed selection on this tap. Keep the last real
-                      // selected range instead of overwriting it.
                       if (_nonCollapsed(selection)) {
                         _lastSelection = selection;
                       }
