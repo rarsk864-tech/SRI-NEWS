@@ -104,12 +104,25 @@ class _AdminPageState extends State<AdminPage> {
         int matterColor = 0xFF6C6767;
         List<MatterSegment> matterSegments = [];
         final matterEditorKey = GlobalKey<MatterColorEditorState>();
+        final titleColorEditorKey = GlobalKey<TitleColorEditorState>();
         return StatefulBuilder(
           builder: (context, setSheetState) {
             Future<void> publish() async {
               final isBreakingNews = selectedImages.isEmpty;
-              setSheetState(() => saving = true);
-              try {
+            setSheetState(() => saving = true);
+            try {
+              final titleEditor = titleColorEditorKey.currentState;
+              final matterEditor = matterEditorKey.currentState;
+              if (titleEditor == null || !titleEditor.isSaved ||
+                  (matterController.text.trim().isNotEmpty && (matterEditor == null || !matterEditor.isSaved))) {
+                setSheetState(() => saving = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Title Colour and Matter Colour Apply chesi Save cheyyandi.')),
+                );
+                return;
+              }
+              titleColor = titleEditor.color;
+              matterColor = matterEditor?.color ?? matterColor;
                 final adminUid = FirebaseAuth.instance.currentUser?.uid ?? '';
                 final imageUrls = <String>[];
 
@@ -128,8 +141,8 @@ class _AdminPageState extends State<AdminPage> {
                 final tag = tagController.text.trim();
                 final title = titleController.text.trim();
                 final matter = matterController.text.trim();
-                final currentMatterSegments = matterEditorKey.currentState?.segments ?? matterSegments;
-                final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
+              final currentMatterSegments = matterEditor?.segments ?? matterSegments;
+              final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
 
                 await db.collection('news').add({
                   'category': tag,
@@ -240,15 +253,15 @@ class _AdminPageState extends State<AdminPage> {
                         onChanged: (_) => setSheetState(() {}),
                       ),
                       const SizedBox(height: 10),
-                      TextField(
+                      TitleColorEditor(
+                        key: titleColorEditorKey,
                         controller: titleController,
+                        colors: _newsColors,
+                        defaultColor: titleColor,
                         enabled: !saving,
-                        decoration: const InputDecoration(
-                          labelText: 'Title (optional)',
-                          border: OutlineInputBorder(),
-                        ),
+                        onSaved: (color) => setSheetState(() => titleColor = color),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 14),
                       MatterColorEditor(
                         key: matterEditorKey,
                         controller: matterController,
@@ -258,29 +271,6 @@ class _AdminPageState extends State<AdminPage> {
                         enabled: !saving,
                         onChanged: (segments) => matterSegments = segments,
                       ),
-                      const SizedBox(height: 12),
-                      const Text('Title Colour', style: TextStyle(fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 6),
-                      Wrap(spacing: 7, children: [
-                        for (final c in _newsColors)
-                          ChoiceChip(label: SizedBox(width: 20, height: 20, child: DecoratedBox(decoration: BoxDecoration(color: Color(c), shape: BoxShape.circle))), selected: titleColor == c, onSelected: saving ? null : (_) => setSheetState(() => titleColor = c)),
-                      ]),
-                      const SizedBox(height: 10),
-                      const Text('Matter Default Colour', style: TextStyle(fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 6),
-                      Wrap(spacing: 7, children: [
-                        for (final c in _newsColors)
-                          ChoiceChip(
-                            label: SizedBox(width: 20, height: 20, child: DecoratedBox(decoration: BoxDecoration(color: Color(c), shape: BoxShape.circle))),
-                            selected: matterColor == c,
-                            onSelected: saving ? null : (_) => setSheetState(() {
-                              matterColor = c;
-                              if (matterController.text.trim().isNotEmpty && matterSegments.isEmpty) {
-                                matterSegments = [MatterSegment(text: matterController.text, color: c)];
-                              }
-                            }),
-                          ),
-                      ]),
                       const SizedBox(height: 14),
                       OutlinedButton.icon(
                         onPressed: saving
@@ -388,7 +378,7 @@ class _AdminPageState extends State<AdminPage> {
                         label: Text(
                           saving
                               ? 'Uploading...'
-                              : 'Upload Images + Details',
+                              : 'Upload Post',
                         ),
                       ),
                     ],
