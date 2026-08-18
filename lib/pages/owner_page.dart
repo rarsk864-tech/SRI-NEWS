@@ -105,22 +105,13 @@ class _OwnerPageState extends State<OwnerPage> {
         int matterColor = 0xFF6C6767;
         List<MatterSegment> matterSegments = [];
         final matterEditorKey = GlobalKey<MatterColorEditorState>();
-        final titleEditorKey = GlobalKey<TitleColorEditorState>();
-        final uploadButtonKey = GlobalKey();
+        final titleColorEditorKey = GlobalKey<TitleColorEditorState>();
         return StatefulBuilder(
           builder: (context, setSheetState) {
             Future<void> publish() async {
               // Image is optional here too. No image means Breaking News.
               final isBreakingNews = selectedImages.isEmpty;
-              final titleNeedsSave = titleController.text.trim().isNotEmpty && !(titleEditorKey.currentState?.isSaved ?? false);
-            final matterNeedsSave = matterController.text.trim().isNotEmpty && !(matterEditorKey.currentState?.isSaved ?? false);
-            if (titleNeedsSave || matterNeedsSave) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Title/Matter colour Apply chesi Save cheyyandi.')),
-              );
-              return;
-            }
-            setSheetState(() => saving = true);
+              setSheetState(() => saving = true);
               try {
                 final ownerUid = FirebaseAuth.instance.currentUser?.uid ?? '';
                 final imageUrls = <String>[];
@@ -137,6 +128,7 @@ class _OwnerPageState extends State<OwnerPage> {
                 final matter = matterController.text.trim();
                 final currentMatterSegments = matterEditorKey.currentState?.segments ?? matterSegments;
                 final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
+                final savedTitleColor = titleColorEditorKey.currentState?.savedColor ?? titleColor;
                 await db.collection('news').add({
                   'category': tag,
                   'tag': tag,
@@ -154,8 +146,8 @@ class _OwnerPageState extends State<OwnerPage> {
                   'publishedBy': ownerUid,
                   'publishedByRole': 'owner',
                   'imageOnly': false,
-                  'titleColor': titleColor,
-                  'titleColorHex': '#${titleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
+                  'titleColor': savedTitleColor,
+                  'titleColorHex': '#${savedTitleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                   'matterColor': matterColor,
                   'matterColorHex': '#${matterColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                   'matterSegments': savedMatterSegments.map((e) => e.toMap()).toList(),
@@ -243,19 +235,6 @@ class _OwnerPageState extends State<OwnerPage> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      TitleColorEditor(
-                        key: titleEditorKey,
-                        controller: titleController,
-                        colors: _newsColors,
-                        initialColor: titleColor,
-                        enabled: !saving,
-                        onSaved: (c) => setSheetState(() => titleColor = c),
-                        onNext: () {
-                          final target = matterEditorKey.currentContext;
-                          if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
-                        },
-                      ),
-                      const SizedBox(height: 14),
                       MatterColorEditor(
                         key: matterEditorKey,
                         controller: matterController,
@@ -264,11 +243,15 @@ class _OwnerPageState extends State<OwnerPage> {
                         initialSegments: matterSegments,
                         enabled: !saving,
                         onChanged: (segments) => matterSegments = segments,
-                        onNext: () {
-                          final target = uploadButtonKey.currentContext;
-                          if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
-                        },
                       ),
+                      const SizedBox(height: 12),
+                       TitleColorEditor(
+                         key: titleColorEditorKey,
+                         colors: _newsColors,
+                         initialColor: titleColor,
+                         enabled: !saving,
+                         onSaved: (color) => titleColor = color,
+                       ),
                       const SizedBox(height: 14),
                       OutlinedButton.icon(
                         onPressed: saving
@@ -371,13 +354,12 @@ class _OwnerPageState extends State<OwnerPage> {
                       ],
                       const SizedBox(height: 16),
                       FilledButton.icon(
-                        key: uploadButtonKey,
                         onPressed: saving ? null : publish,
                         icon: const Icon(Icons.cloud_upload_outlined),
                         label: Text(
                           saving
                               ? 'Uploading...'
-                              : 'Upload Post',
+                              : 'Upload Images + Details',
                         ),
                       ),
                     ],
@@ -535,6 +517,8 @@ class _OwnerPageState extends State<OwnerPage> {
     bool breaking = data['breaking'] == true;
     int titleColor = (data['titleColor'] is num) ? (data['titleColor'] as num).toInt() : 0xFF171313;
     int matterColor = (data['matterColor'] is num) ? (data['matterColor'] as num).toInt() : 0xFF6C6767;
+    final titleColorEditorKey = GlobalKey<TitleColorEditorState>();
+    final matterEditorKey = GlobalKey<MatterColorEditorState>();
     List<MatterSegment> matterSegments = (data['matterSegments'] is List)
         ? (data['matterSegments'] as List).map((e) => MatterSegment.fromMap(e, matterColor)).where((e) => e.text.isNotEmpty).toList()
         : (content.text.isNotEmpty ? [MatterSegment(text: content.text, color: matterColor)] : []);
@@ -577,9 +561,6 @@ class _OwnerPageState extends State<OwnerPage> {
       context: context,
       builder: (dialogContext) {
         bool saving = false;
-        final matterEditorKeyEdit = GlobalKey<MatterColorEditorState>();
-        final titleEditorKeyEdit = GlobalKey<TitleColorEditorState>();
-        final uploadButtonKeyEdit = GlobalKey();
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -590,15 +571,6 @@ class _OwnerPageState extends State<OwnerPage> {
                   const SnackBar(
                     content: Text('Title and content are required.'),
                   ),
-                );
-                return;
-              }
-
-              final titleNeedsSave = title.text.trim().isNotEmpty && !(titleEditorKeyEdit.currentState?.isSaved ?? false);
-              final matterNeedsSave = content.text.trim().isNotEmpty && !(matterEditorKeyEdit.currentState?.isSaved ?? false);
-              if (titleNeedsSave || matterNeedsSave) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Title/Matter colour Apply chesi Save cheyyandi.')),
                 );
                 return;
               }
@@ -628,6 +600,10 @@ class _OwnerPageState extends State<OwnerPage> {
 
                 final firstImage = imageUrls.isNotEmpty ? imageUrls.first : '';
 
+                final currentMatterSegments = matterEditorKey.currentState?.segments ?? matterSegments;
+                final savedMatterSegments = normalizedMatterSegments(content.text.trim(), currentMatterSegments, matterColor);
+                final savedTitleColor = titleColorEditorKey.currentState?.savedColor ?? titleColor;
+
                 await doc.reference.update({
                   'title': title.text.trim(),
                   'description': content.text.trim(),
@@ -642,10 +618,10 @@ class _OwnerPageState extends State<OwnerPage> {
                     'imageUrls': imageUrls,
                   },
                   'breaking': breaking,
-                  'titleColor': titleColor,
-                  'titleColorHex': '#${titleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
+                  'titleColor': savedTitleColor,
+                  'titleColorHex': '#${savedTitleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                   'matterColor': matterColor,
-                  'matterSegments': normalizedMatterSegments(content.text.trim(), matterSegments, matterColor).map((e) => e.toMap()).toList(),
+                  'matterSegments': savedMatterSegments.map((e) => e.toMap()).toList(),
                   'matterColorHex': '#${matterColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                   'editedAt': FieldValue.serverTimestamp(),
                   'editedBy': uid,
@@ -815,32 +791,23 @@ class _OwnerPageState extends State<OwnerPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    TitleColorEditor(
-                      key: titleEditorKeyEdit,
-                      controller: title,
-                      colors: _newsColors,
-                      initialColor: titleColor,
-                      enabled: !saving,
-                      onSaved: (c) => setDialogState(() => titleColor = c),
-                      onNext: () {
-                        final target = matterEditorKeyEdit.currentContext;
-                        if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
-                      },
-                    ),
-                    const SizedBox(height: 14),
                     MatterColorEditor(
-                      key: matterEditorKeyEdit,
+                      key: matterEditorKey,
                       controller: content,
                       colors: _newsColors,
                       defaultColor: matterColor,
                       initialSegments: matterSegments,
                       enabled: !saving,
                       onChanged: (segments) => matterSegments = segments,
-                      onNext: () {
-                        final target = uploadButtonKeyEdit.currentContext;
-                        if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
-                      },
                     ),
+                    const SizedBox(height: 12),
+                     TitleColorEditor(
+                       key: titleColorEditorKey,
+                       colors: _newsColors,
+                       initialColor: titleColor,
+                       enabled: !saving,
+                       onSaved: (color) => titleColor = color,
+                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       value: breaking,
@@ -862,7 +829,6 @@ class _OwnerPageState extends State<OwnerPage> {
                   child: const Text('Cancel'),
                 ),
                 FilledButton(
-                  key: uploadButtonKeyEdit,
                   onPressed: saving ? null : save,
                   child: Text(saving ? 'Saving...' : 'Save'),
                 ),

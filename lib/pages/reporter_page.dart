@@ -91,8 +91,7 @@ class _ReporterPageState extends State<ReporterPage> {
         int matterColor = 0xFF6C6767;
         List<MatterSegment> matterSegments = [];
         final matterEditorKey = GlobalKey<MatterColorEditorState>();
-        final titleEditorKey = GlobalKey<TitleColorEditorState>();
-        final uploadButtonKey = GlobalKey();
+        final titleColorEditorKey = GlobalKey<TitleColorEditorState>();
         return StatefulBuilder(builder: (context, setSheetState) {
           Future<void> submit() async {
             final user = FirebaseAuth.instance.currentUser;
@@ -101,14 +100,6 @@ class _ReporterPageState extends State<ReporterPage> {
               return;
             }
             // Images are optional here. No image means this is a Breaking News submission.
-            final titleNeedsSave = titleController.text.trim().isNotEmpty && !(titleEditorKey.currentState?.isSaved ?? false);
-            final matterNeedsSave = matterController.text.trim().isNotEmpty && !(matterEditorKey.currentState?.isSaved ?? false);
-            if (titleNeedsSave || matterNeedsSave) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Title/Matter colour Apply chesi Save cheyyandi.')),
-              );
-              return;
-            }
             setSheetState(() => saving = true);
             try {
               final userSnapshot = await db.collection('users').doc(user.uid).get();
@@ -140,6 +131,7 @@ class _ReporterPageState extends State<ReporterPage> {
               final matter = matterController.text.trim();
                 final currentMatterSegments = matterEditorKey.currentState?.segments ?? matterSegments;
                 final savedMatterSegments = normalizedMatterSegments(matter, currentMatterSegments, matterColor);
+                final savedTitleColor = titleColorEditorKey.currentState?.savedColor ?? titleColor;
               final isBreaking = detailImages.isEmpty;
               final postTitle = enteredTitle.isEmpty && isBreaking
                   ? 'BREAKING NEWS'
@@ -160,8 +152,8 @@ class _ReporterPageState extends State<ReporterPage> {
                 'imageOnly': false,
                 'breaking': isBreaking,
                 'createdAt': FieldValue.serverTimestamp(),
-                'titleColor': titleColor,
-                  'titleColorHex': '#${titleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
+                'titleColor': savedTitleColor,
+                  'titleColorHex': '#${savedTitleColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                 'matterColor': matterColor,
                   'matterColorHex': '#${matterColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                   'matterSegments': savedMatterSegments.map((e) => e.toMap()).toList(),
@@ -259,19 +251,6 @@ class _ReporterPageState extends State<ReporterPage> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      TitleColorEditor(
-                        key: titleEditorKey,
-                        controller: titleController,
-                        colors: _newsColors,
-                        initialColor: titleColor,
-                        enabled: !saving,
-                        onSaved: (c) => setSheetState(() => titleColor = c),
-                        onNext: () {
-                          final target = matterEditorKey.currentContext;
-                          if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
-                        },
-                      ),
-                      const SizedBox(height: 14),
                       MatterColorEditor(
                         key: matterEditorKey,
                         controller: matterController,
@@ -280,11 +259,15 @@ class _ReporterPageState extends State<ReporterPage> {
                         initialSegments: matterSegments,
                         enabled: !saving,
                         onChanged: (segments) => matterSegments = segments,
-                        onNext: () {
-                          final target = uploadButtonKey.currentContext;
-                          if (target != null) Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 250), alignment: 0.05);
-                        },
                       ),
+                      const SizedBox(height: 12),
+                       TitleColorEditor(
+                         key: titleColorEditorKey,
+                         colors: _newsColors,
+                         initialColor: titleColor,
+                         enabled: !saving,
+                         onSaved: (color) => titleColor = color,
+                       ),
                       const SizedBox(height: 14),
                       OutlinedButton.icon(
                         onPressed: saving
@@ -387,13 +370,12 @@ class _ReporterPageState extends State<ReporterPage> {
                       ],
                       const SizedBox(height: 16),
                       FilledButton.icon(
-                        key: uploadButtonKey,
                         onPressed: saving ? null : submit,
                         icon: const Icon(Icons.cloud_upload_outlined),
                         label: Text(
                           saving
                               ? 'Uploading...'
-                              : 'Upload Post',
+                              : 'Upload Images + Details',
                         ),
                       ),
                     ],
