@@ -136,11 +136,16 @@ class _HomePageState extends State<HomePage> {
               final items = s.data ?? [];
               if (items.isEmpty) return const Center(child: Text('No news available'));
 
+              // Breaking ticker: show ONLY posts published today.
+              // Include both text-only breaking posts and posts that contain images.
+              // The ticker is intentionally based on today's date, not the last 24 hours.
               final now = DateTime.now();
+              final todayStart = DateTime(now.year, now.month, now.day);
+              final tomorrowStart = todayStart.add(const Duration(days: 1));
               final breaking = items.where((e) {
                 final d = e.publishedAt?.toLocal();
-                final cutoff = now.subtract(const Duration(days: 3));
-                return e.breaking && d != null && d.isAfter(cutoff);
+                if (d == null) return false;
+                return !d.isBefore(todayStart) && d.isBefore(tomorrowStart);
               }).toList();
               return Column(
                 children: [
